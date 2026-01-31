@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的基金实盘 Ultimate</title>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+    <title>我的基金实盘 (国内加速版)</title>
+    <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.prod.min.js"></script>
+    <script src="https://cdn.staticfile.net/echarts/5.4.3/echarts.min.js"></script>
+    <script src="https://cdn.staticfile.net/tailwindcss/3.3.3/tailwind.min.js"></script>
+    
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -46,14 +47,17 @@
         .history-table th { text-align: right; color: #6b7280; font-size: 10px; }
         .history-table td { color: #d1d5db; font-family: monospace; font-size: 12px; }
 
-        [v-cloak] { display: none; }
+        /* 如果Vue加载失败，这行样式会让页面全黑，为了保险起见，我们移除它，或者只在Vue挂载后生效 */
+        /* [v-cloak] { display: none; } */
     </style>
 </head>
 <body class="text-gray-300">
 
-<div id="app" v-cloak class="app-layout">
+<div id="loading-mask" style="position:fixed;top:0;left:0;width:100%;height:100%;background:#000;color:#fff;z-index:9999;display:flex;justify-content:center;align-items:center;">
+    正在加载资源... 如果长时间停留在此处，请按 F12 查看报错
+</div>
 
-    <header class="col-span-2 flex justify-center items-center relative">
+<div id="app" class="app-layout" style="visibility: hidden;"> <header class="col-span-2 flex justify-center items-center relative">
         <div class="bg-gray-900 border border-gray-800 golden-rounded px-6 py-2 flex items-center gap-8 shadow-lg z-10">
             <div class="text-center">
                 <div class="text-xs text-gray-500 mb-0.5">预估今日收益</div>
@@ -62,33 +66,4 @@
                 </div>
             </div>
             <div class="w-px h-6 bg-gray-800"></div>
-            <div class="text-center min-w-[100px]">
-                <div class="text-xs text-gray-500 mb-0.5 flex items-center justify-center gap-1">
-                    持有总额
-                    <button @click="togglePrivacy" class="hover:text-white transition">
-                         <span v-if="settings.privacyMode">👁️‍🗨️</span><span v-else>👁️</span>
-                    </button>
-                </div>
-                <div class="text-lg font-bold font-mono text-white">
-                    {{ settings.privacyMode ? '****' : totalAmount }}
-                </div>
-            </div>
-            <div class="w-px h-6 bg-gray-800"></div>
-            <div class="text-center">
-                <div class="text-xs text-gray-500 mb-0.5">当前数据源</div>
-                <div class="text-xs font-bold text-blue-400 px-2 py-0.5 rounded bg-blue-900/20 border border-blue-900/50">
-                    {{ currentSourceName }}
-                </div>
-            </div>
-
-            <div class="ml-4 flex gap-2">
-                <button @click="manualRefresh" title="刷新" class="p-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white shadow-lg transition group">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 group-hover:animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.051M20 20v-5h-.051M9.8 15.6a6 6 0 10-3.6-7" /></svg>
-                </button>
-                <button @click="showSettings = true" title="设置" class="p-1.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-400 transition">⚙️</button>
-            </div>
-        </div>
-    </header>
-
-    <main class="relative overflow-hidden flex flex-col">
-        <div class="mb-3 relative z-20
+            <div class="text-center min-w
