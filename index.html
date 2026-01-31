@@ -2,12 +2,12 @@
 <html lang="zh-CN" class="dark">
 <head>
     <meta charset="UTF-8">
+    <meta name="referrer" content="no-referrer">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的基金实盘</title>
+    <title>我的基金实盘 - 最终完美版</title>
     
     <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.prod.min.js"></script>
     <script src="https://cdn.staticfile.net/echarts/5.4.3/echarts.min.js"></script>
-    <script src="https://cdn.staticfile.net/jquery/3.7.1/jquery.min.js"></script>
     
     <style>
         :root {
@@ -18,7 +18,6 @@
             --text-main: #eef2f5;
             --text-sub: #78859e;
             --accent: #3b82f6;
-            --accent-hover: #2563eb;
             --up: #fa5252;
             --down: #00e676;
             --border-radius: 8px;
@@ -36,9 +35,9 @@
             font-size: var(--font-size-base);
         }
 
-        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 2px; }
 
         .layout {
             display: grid;
@@ -99,7 +98,6 @@
             min-height: 0; 
         }
 
-        /* 详情卡片 */
         .detail-card {
             background: var(--bg-panel); border-radius: var(--border-radius); padding: 15px;
             display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;
@@ -111,7 +109,6 @@
 
         .chart-panel { background: var(--bg-panel); border-radius: var(--border-radius); border: 1px solid var(--border-soft); position: relative; }
         
-        /* 重仓股列表 */
         .holdings-panel { 
             background: var(--bg-panel); border-radius: var(--border-radius); border: 1px solid var(--border-soft); 
             display: flex; flex-direction: column; overflow: hidden;
@@ -153,7 +150,7 @@
             font-weight: 600; font-size: 12px; transition: all 0.2s; text-align: center;
         }
         .btn-primary { background: var(--accent); color: white; }
-        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-primary:hover { background: #2563eb; }
         .btn-danger { background: rgba(250, 82, 82, 0.1); color: #fa5252; border: 1px solid rgba(250, 82, 82, 0.2); }
         .btn-danger:hover { background: rgba(250, 82, 82, 0.2); }
 
@@ -262,7 +259,7 @@
         <div class="holdings-panel">
             <div class="panel-header">
                 <span>重仓股票持仓 (Top 10)</span>
-                <span style="font-size:11px; color:var(--accent); cursor:pointer" @click="retryHoldings">↻ 重试</span>
+                <span v-if="isLoadingStock" style="font-size:11px; color:var(--accent);">⟳ 更新中...</span>
             </div>
             <div class="holdings-list">
                 <div v-for="s in holdingsData" :key="s.code" class="stock-row">
@@ -323,10 +320,10 @@
         </div>
 
         <div class="control-group">
-            <span class="label">股票数据源 (解决不显示问题)</span>
-            <select v-model="settings.stockSource" class="select-styled" @change="retryHoldings">
-                <option value="tencent">腾讯接口 (推荐)</option>
-                <option value="eastmoney">东财接口 (最准)</option>
+            <span class="label">数据源 (修复加载问题)</span>
+            <select v-model="settings.stockSource" class="select-styled" @change="manualRefresh">
+                <option value="tencent">腾讯接口 (极速)</option>
+                <option value="eastmoney">东财接口 (精确)</option>
                 <option value="sina">新浪接口 (备用)</option>
             </select>
 
@@ -364,9 +361,9 @@
             const currentFundEdit = ref({ amount: 0 });
             const isMarketOpen = ref(false);
             const stockStatusMsg = ref("点击基金查看详情");
+            const isLoadingStock = ref(false); // 新增：加载状态，不清除数据
 
             let chartInstance = null;
-            // 缓存东财重仓股代码列表，避免重复请求
             const fundStockCache = {}; 
 
             // --- 核心逻辑 ---
@@ -401,14 +398,20 @@
 
             // 获取详情：仅为了获取持仓股票代码
             const fetchDetailData = (code) => {
-                holdingsData.value = [];
-                stockStatusMsg.value = "加载中...";
+                // 注意：这里不要直接 holdingsData.value = []，防止闪烁
+                // 只有第一次加载时才清空，或者切换基金时清空
+                // 如果是刷新，保持旧数据，直到新数据回来
+                
+                isLoadingStock.value = true;
                 
                 // 优先从缓存取代码
                 if (fundStockCache[code]) {
                     fetchStockDetails(fundStockCache[code]);
                     return;
                 }
+                
+                // 如果没有缓存，说明是新基金，先显示加载
+                if (holdingsData.value.length === 0) stockStatusMsg.value = "加载中...";
 
                 const ts = new Date().getTime();
                 const s = document.createElement('script');
@@ -421,10 +424,16 @@
                         fetchStockDetails(codes);
                     } else {
                         stockStatusMsg.value = "无公开持仓数据";
+                        holdingsData.value = [];
+                        isLoadingStock.value = false;
                     }
                     s.remove();
                 };
-                s.onerror = () => { stockStatusMsg.value = "持仓加载失败"; s.remove(); };
+                s.onerror = () => { 
+                    if(!holdingsData.value.length) stockStatusMsg.value = "持仓加载失败"; 
+                    isLoadingStock.value = false;
+                    s.remove(); 
+                };
                 document.body.appendChild(s);
             };
 
@@ -436,13 +445,13 @@
                 else fetchStocksSina(codes);
             };
 
-            // 1. 腾讯接口 (最稳)
+            // 1. 腾讯接口 (修复版：自动识别市场前缀)
             const fetchStocksTencent = (codes) => {
                 const qqCodes = codes.map(c => {
                     if (c.startsWith('6')) return `sh${c}`;
                     if (c.startsWith('0') || c.startsWith('3')) return `sz${c}`;
                     if (c.startsWith('4') || c.startsWith('8')) return `bj${c}`;
-                    if (c.length === 5) return `hk${c}`; // 港股支持
+                    if (c.length === 5) return `hk${c}`; 
                     return `sh${c}`;
                 }).join(',');
 
@@ -457,49 +466,61 @@
                         let name = c, percent = "--";
                         
                         if (window[vName]) {
-                            // 腾讯格式: "1~名字~代码~当前价~昨收~..."
-                            // 涨跌幅 = (当前-昨收)/昨收 * 100
                             const parts = window[vName].split('~');
                             if (parts.length > 32) {
                                 name = parts[1];
-                                // 腾讯第32位通常是涨跌幅%
-                                percent = parts[32];
+                                percent = parts[32]; // 涨跌幅
                             }
                         }
                         res.push({ code: c, name: name, percent: percent });
                     });
-                    holdingsData.value = res;
+                    holdingsData.value = res; // 替换数据
+                    isLoadingStock.value = false;
                     s.remove();
                 };
-                s.onerror = () => { stockStatusMsg.value = "腾讯接口拦截，请切换源"; s.remove(); };
+                s.onerror = () => { 
+                    stockStatusMsg.value = "接口拦截"; 
+                    isLoadingStock.value = false; 
+                    s.remove(); 
+                };
                 document.body.appendChild(s);
             };
 
-            // 2. 东财接口 (最准，JSONP)
+            // 2. 东财接口
             const fetchStocksEastmoney = (codes) => {
-                // 东财 secid 转换: 1.600xxx (沪), 0.00xxxx (深/京)
                 const secIds = codes.map(c => {
                     if (c.startsWith('6')) return `1.${c}`;
+                    if (c.length === 5) return `116.${c}`; // 港股简单处理
                     return `0.${c}`;
                 }).join(',');
 
                 const s = document.createElement('script');
-                // push2 接口，f3=涨跌幅, f12=代码, f14=名称
                 const cbName = `cb_em_${parseInt(Math.random()*10000)}`;
                 window[cbName] = (data) => {
                     if(data && data.data && data.data.diff) {
                         const res = [];
-                        // 顺序可能乱，需要按原代码顺序重排，或者直接遍历返回结果
+                        // 建立 map 保证顺序
+                        const map = {};
                         data.data.diff.forEach(item => {
-                            res.push({
-                                code: item.f12,
-                                name: item.f14,
-                                percent: item.f3 == '-' ? '0.00' : item.f3 
-                            });
+                            map[item.f12] = item;
+                        });
+                        
+                        codes.forEach(c => {
+                            const item = map[c];
+                            if(item) {
+                                res.push({
+                                    code: c,
+                                    name: item.f14,
+                                    percent: item.f3 == '-' ? '0.00' : item.f3 
+                                });
+                            } else {
+                                res.push({ code: c, name: c, percent: '--' });
+                            }
                         });
                         holdingsData.value = res;
                     }
                     delete window[cbName];
+                    isLoadingStock.value = false;
                     s.remove();
                 };
 
@@ -507,7 +528,7 @@
                 document.body.appendChild(s);
             };
 
-            // 3. 新浪接口 (备用)
+            // 3. 新浪接口
             const fetchStocksSina = (codes) => {
                 const sinaCodes = codes.map(c => {
                     if (c.startsWith('6')) return `sh${c}`;
@@ -518,7 +539,7 @@
 
                 const s = document.createElement('script');
                 s.src = `https://hq.sinajs.cn/list=${sinaCodes}`;
-                s.charset = "gbk"; // 必须gbk
+                s.charset = "gbk"; 
                 
                 s.onload = () => {
                     const res = [];
@@ -526,7 +547,6 @@
                         const vName = `hq_str_${sinaCodes.split(',')[idx]}`;
                         let name = c, percent = "--";
                         if (window[vName]) {
-                            // 格式: 名字,今开,昨收,当前,...
                             const parts = window[vName].split(',');
                             if (parts.length > 3) {
                                 name = parts[0];
@@ -538,12 +558,13 @@
                         res.push({ code: c, name: name, percent: percent });
                     });
                     holdingsData.value = res;
+                    isLoadingStock.value = false;
                     s.remove();
                 };
                 document.body.appendChild(s);
             };
 
-            // --- 其他逻辑保持不变 ---
+            // --- 确定性 K线 ---
             const deterministicNoise = (seed) => {
                 const x = Math.sin(seed * 9999) * 10000;
                 return (x - Math.floor(x)) - 0.5;
@@ -589,7 +610,7 @@
                     dataPoints.push({ time: timeStr, value: val.toFixed(4) });
                 }
 
-                const color = rate >= 0 ? '#fa5252' : '#00e676';
+                const color = rate >= 0 ? '#fa5252' : '#00e676'; // 红涨绿跌
                 const bgGradient = new echarts.graphic.LinearGradient(0,0,0,1, [{offset:0, color:color},{offset:1, color:'rgba(0,0,0,0)'}]);
 
                 chartInstance.setOption({
@@ -629,6 +650,12 @@
             };
 
             const selectFund = (f) => {
+                // 如果切换了不同的基金，才清空重仓股数据，避免闪烁
+                if (selectedFundCode.value !== f.code) {
+                    holdingsData.value = [];
+                    stockStatusMsg.value = "加载中...";
+                }
+                
                 selectedFundCode.value = f.code;
                 currentFundEdit.value.amount = (f.shares * (parseFloat(f.gsz)||1)).toFixed(2);
                 fetchDetailData(f.code);
@@ -650,11 +677,6 @@
                 }
             };
 
-            const retryHoldings = () => {
-                if(selectedFundCode.value) fetchDetailData(selectedFundCode.value);
-            };
-
-            // 数据计算
             const getFundAmount = (f) => `¥${(f.shares * parseFloat(f.gsz || 0)).toFixed(2)}`;
             const calcProfitRaw = (f) => (!f.shares ? "0.00" : ((parseFloat(f.gsz) - parseFloat(f.gsz)/(1+parseFloat(f.gszzl)/100)) * f.shares).toFixed(2));
             
@@ -674,15 +696,17 @@
                 return t ? t.split(' ')[0] : '--';
             }
 
-            const saveData = () => localStorage.setItem('myFunds_V4_Final', JSON.stringify(funds.value));
-            const manualRefresh = () => { funds.value.forEach(f => fetchFundData(f.code)); if(selectedFundCode.value) renderChart(); };
+            const saveData = () => localStorage.setItem('myFunds_V5_MultiSource', JSON.stringify(funds.value));
+            const manualRefresh = () => { funds.value.forEach(f => fetchFundData(f.code)); if(selectedFundCode.value) fetchDetailData(selectedFundCode.value); };
 
             onMounted(() => {
-                const d = localStorage.getItem('myFunds_V4_Final');
+                const d = localStorage.getItem('myFunds_V5_MultiSource');
                 if(d) funds.value = JSON.parse(d);
                 else funds.value = [{code:'000001', name:'示例基金', shares:0, gszzl:'0.00', gsz:'1.000'}];
                 
+                // 首次加载所有数据
                 manualRefresh();
+                
                 setInterval(() => { 
                     refreshCountdown.value--; 
                     if(refreshCountdown.value<=0) { manualRefresh(); refreshCountdown.value=10; } 
@@ -691,7 +715,7 @@
             });
 
             return {
-                funds, selectedFundCode, searchInput, searchResults, holdingsData, settings, currentFundEdit, refreshCountdown, isMarketOpen, stockStatusMsg,
+                funds, selectedFundCode, searchInput, searchResults, holdingsData, settings, currentFundEdit, refreshCountdown, isMarketOpen, stockStatusMsg, isLoadingStock,
                 selectFund, handleSearch, addFund, manualRefresh, saveCurrentFund, removeCurrentFund, retryHoldings,
                 totalDailyProfit, totalAssetValue, dailyTotalRate, 
                 getSelectedFundName, getSelectedFundVal, getSelectedFundRate, getSelectedFundDate,
