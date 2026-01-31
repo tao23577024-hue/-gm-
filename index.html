@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的基金实盘 - 修复版</title>
+    <title>我的基金实盘 - 金额模式版</title>
     
     <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.prod.min.js"></script>
     <script src="https://cdn.staticfile.net/echarts/5.4.3/echarts.min.js"></script>
@@ -39,17 +39,15 @@
             font-size: var(--font-size-base);
         }
 
-        /* 错误日志浮窗 */
         #debug-console {
             position: fixed; bottom: 0; right: 0; width: 300px; max-height: 150px;
             background: rgba(100, 0, 0, 0.9); color: white; font-size: 10px;
-            overflow-y: auto; z-index: 9999; padding: 5px; display: none;
-            pointer-events: none;
+            overflow-y: auto; z-index: 9999; padding: 5px; display: none; pointer-events: none;
         }
 
         .layout {
             display: grid;
-            grid-template-columns: 240px 1fr 200px; 
+            grid-template-columns: 260px 1fr 200px;
             grid-template-rows: 60px minmax(0, 1fr); 
             gap: 4px; padding: 4px;
             height: 100vh;
@@ -83,11 +81,11 @@
 
         .col-left { grid-row: 2 / 3; grid-column: 1 / 2; }
         .fund-list { flex: 1; overflow-y: auto; }
-        .fund-item { padding: 8px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
+        .fund-item { padding: 10px 8px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
         .fund-item:hover { background: var(--hover-bg); }
         .fund-item.active { background: var(--active-bg); border-left: 2px solid var(--accent); }
-        .fi-row { display: flex; justify-content: space-between; align-items: baseline; }
-        .fi-name { font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+        .fi-row { display: flex; justify-content: space-between; align-items: baseline; line-height: 1.4; }
+        .fi-name { font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; font-size: 13px; }
 
         .col-center { 
             grid-row: 2 / 3; grid-column: 2 / 3; 
@@ -178,10 +176,16 @@
                     <span class="fi-name">{{ fund.name }}</span>
                     <span :class="parseFloat(fund.gszzl)>=0?'t-up':'t-down'" style="font-weight:bold">{{ fund.gszzl }}%</span>
                 </div>
-                <div class="fi-row" style="margin-top:2px;">
+                <div class="fi-row" style="margin-top:4px;">
                     <span style="font-size:10px; color:var(--text-sub)">{{ fund.code }}</span>
-                    <span style="font-size:10px; color:var(--text-sub)">
-                        {{ settings.privacyMode ? '**' : fund.shares }}份
+                    <span style="font-size:11px; font-weight:bold; color:var(--text-main)">
+                        {{ settings.privacyMode ? '****' : getFundAmount(fund) }}
+                    </span>
+                </div>
+                <div class="fi-row" style="margin-top:2px;" v-if="!settings.privacyMode && fund.shares > 0">
+                    <span style="font-size:10px; color:var(--text-sub)">今日:</span>
+                    <span :class="calcProfitRaw(fund) >= 0 ? 't-up' : 't-down'" style="font-weight:bold; font-size:12px;">
+                        {{ calcProfitRaw(fund) >= 0 ? '+' : '' }}{{ calcProfitRaw(fund) }}
                     </span>
                 </div>
             </div>
@@ -247,13 +251,13 @@
             </div>
             
             <div class="compact-row">
-                <span class="compact-label">持有份额 / 调整</span>
+                <span class="compact-label">持有金额 (CNY)</span>
                 <div class="input-group">
-                    <input type="number" step="100" v-model.number="currentFundEdit.shares" class="input-mini" placeholder="份">
+                    <input type="number" v-model.number="currentFundEdit.amount" class="input-mini" placeholder="¥">
                     <button class="btn-mini btn-blue" @click="saveCurrentFund" title="保存">OK</button>
                 </div>
                 <div style="font-size:10px; color:var(--text-sub); text-align:right">
-                    市值: {{ (currentFundEdit.shares * parseFloat(getSelectedFundVal()||0)).toFixed(0) }}
+                    (自动折算份额)
                 </div>
             </div>
 
@@ -314,7 +318,7 @@
             const isLightMode = ref(false);
             const refreshCountdown = ref(5);
             const settings = ref({ privacyMode: false, fontSize: 12 });
-            const currentFundEdit = ref({ shares: 0 }); 
+            const currentFundEdit = ref({ amount: 0 }); // 修改：使用 amount
             const isMarketOpen = ref(false);
             const statusMsg = ref("无数据");
             const stockStatusMsg = ref("无数据");
@@ -322,7 +326,6 @@
             let chartInstance = null;
             let timerInterval = null;
 
-            // 检查市场状态
             const checkMarketStatus = () => {
                 const now = new Date();
                 const day = now.getDay();
@@ -334,16 +337,14 @@
                 return false;
             };
 
-            // 获取实时估值 (使用 fundgz 接口，如果失败则尝试忽略)
             const fetchFundData = (code) => {
                 const ts = new Date().getTime();
                 const script = document.createElement('script');
-                // 注意：fundgz 在 HTTPS 下可能会因为证书问题被拦截，如果被拦截请查看右下角报错
                 script.src = `https://fundgz.1234567.com.cn/js/${code}.js?rt=${ts}`;
                 script.onload = () => script.remove();
                 script.onerror = () => {
                     script.remove();
-                    console.log(`Fund ${code} load failed (likely network/https issue)`);
+                    console.log(`Fund ${code} load failed`);
                 };
                 document.body.appendChild(script);
             };
@@ -359,7 +360,6 @@
                 }
             };
 
-            // 获取详情与股票名称 (腾讯接口)
             const fetchDetailData = (code) => {
                 historyData.value = []; 
                 holdingsData.value = [];
@@ -397,7 +397,6 @@
                 document.body.appendChild(script);
             };
 
-            // 腾讯接口查股票名 (支持 HTTPS)
             const fetchStockNamesGtimg = (codes) => {
                 const qqCodes = codes.map(c => {
                     if (c.startsWith('6')) return `sh${c}`;
@@ -433,7 +432,11 @@
                 document.body.appendChild(script);
             };
 
-            // 渲染图表
+            const deterministicNoise = (seed) => {
+                const x = Math.sin(seed * 9999) * 10000;
+                return (x - Math.floor(x)) - 0.5;
+            };
+
             const renderChart = () => {
                 if (!selectedFundCode.value) return;
                 const dom = document.getElementById('mainChart');
@@ -448,7 +451,8 @@
                 const currentVal = parseFloat(target.gsz);
                 const rate = parseFloat(target.gszzl);
                 const preClose = currentVal / (1 + rate / 100); 
-                
+                const codeSeed = parseInt(target.code) || 12345;
+
                 const dataPoints = [];
                 const totalMinutes = 240; 
                 let endMinute = totalMinutes;
@@ -460,7 +464,6 @@
                     let minutesPassed = 0;
                     if (h < 12) minutesPassed = (h - 9) * 60 + (m - 30);
                     else minutesPassed = 120 + (h - 13) * 60 + m; 
-                    
                     if (minutesPassed < 0) minutesPassed = 0;
                     if (minutesPassed > 240) minutesPassed = 240;
                     endMinute = minutesPassed;
@@ -486,7 +489,8 @@
                         val = currentVal;
                     } else {
                         const base = preClose + step * i;
-                        const noise = (Math.random() - 0.5) * (Math.abs(currentVal - preClose) * 0.1 || 0.002); 
+                        const amplitude = Math.abs(currentVal - preClose) * 0.1 || 0.002;
+                        const noise = deterministicNoise(codeSeed + i) * amplitude;
                         val = base + noise;
                     }
                     dataPoints.push({ time: timeStr, value: val.toFixed(4) });
@@ -537,7 +541,6 @@
                 if(searchInput.value.length < 2) { searchResults.value = []; return; }
                 const s = document.createElement('script');
                 window.FundSearchCallBack = (d) => { searchResults.value = d.Datas || []; s.remove(); };
-                // 搜索接口
                 s.src = `https://fundsuggest.eastmoney.com/FundSearch/api/FundSearchAPI.ashx?m=1&key=${encodeURIComponent(searchInput.value)}&callback=FundSearchCallBack`;
                 document.body.appendChild(s);
             };
@@ -550,9 +553,12 @@
                 searchInput.value = ""; searchResults.value = [];
             };
 
+            // 选中基金时，将 shares 转换为 amount 填入编辑框
             const selectFund = (f) => {
                 selectedFundCode.value = f.code;
-                currentFundEdit.value.shares = f.shares || 0;
+                const gsz = parseFloat(f.gsz) || 1;
+                // 反算：Amount = Shares * NAV
+                currentFundEdit.value.amount = (f.shares * gsz).toFixed(2);
                 fetchDetailData(f.code);
                 setTimeout(() => {
                    if(chartInstance) chartInstance.resize(); 
@@ -560,9 +566,16 @@
                 }, 100);
             };
 
+            // 保存逻辑：用户输入的是金额，我们要存的是份额
             const saveCurrentFund = () => {
                 const t = funds.value.find(f => f.code === selectedFundCode.value);
-                if(t) { t.shares = currentFundEdit.value.shares; saveData(); }
+                if(t) { 
+                    const gsz = parseFloat(t.gsz) || 1;
+                    // 正算：Shares = Amount / NAV
+                    const amt = parseFloat(currentFundEdit.value.amount) || 0;
+                    t.shares = amt / gsz;
+                    saveData(); 
+                }
             };
             
             const removeCurrentFund = () => {
@@ -572,12 +585,25 @@
                 }
             };
 
-            const calcProfit = (f) => (!f.shares ? 0 : ((parseFloat(f.gsz) - parseFloat(f.gsz)/(1+parseFloat(f.gszzl)/100)) * f.shares).toFixed(2));
-            const totalDailyProfit = computed(() => funds.value.reduce((a, b) => a + parseFloat(calcProfit(b)), 0).toFixed(2));
+            // 辅助计算：显示金额 (Display Amount)
+            const getFundAmount = (f) => {
+                const amt = (f.shares * parseFloat(f.gsz || 0)).toFixed(2);
+                return `¥${amt}`;
+            };
+
+            // 辅助计算：今日盈亏
+            const calcProfitRaw = (f) => {
+                if(!f.shares) return "0.00";
+                const v = ((parseFloat(f.gsz) - parseFloat(f.gsz)/(1+parseFloat(f.gszzl)/100)) * f.shares).toFixed(2);
+                return isNaN(v) ? "0.00" : v;
+            };
+
+            const totalDailyProfit = computed(() => funds.value.reduce((a, b) => a + parseFloat(calcProfitRaw(b)), 0).toFixed(2));
             const totalAssetValue = computed(() => funds.value.reduce((a, b) => a + (parseFloat(b.gsz)||0)*b.shares, 0).toFixed(0));
             const dailyTotalRate = computed(() => {
                 const p = parseFloat(totalDailyProfit.value), a = parseFloat(totalAssetValue.value);
-                return (a-p) === 0 ? "0.00" : ((p/(a-p))*100).toFixed(2);
+                const base = a - p;
+                return (base <= 0.1) ? "0.00" : ((p/base)*100).toFixed(2);
             });
             
             const getSelectedFundName = () => funds.value.find(i=>i.code===selectedFundCode.value)?.name || '';
@@ -586,7 +612,7 @@
 
             const toggleTheme = () => { isLightMode.value = !isLightMode.value; document.documentElement.className = isLightMode.value ? 'light' : 'dark'; };
             const updateFont = () => document.documentElement.style.setProperty('--font-size-base', settings.value.fontSize + 'px');
-            const saveData = () => localStorage.setItem('myFunds_V2_HTTPS', JSON.stringify(funds.value));
+            const saveData = () => localStorage.setItem('myFunds_V3_AmountMode', JSON.stringify(funds.value));
             
             const manualRefresh = () => {
                 funds.value.forEach(f => fetchFundData(f.code));
@@ -595,7 +621,7 @@
 
             onMounted(() => {
                 try {
-                    const d = localStorage.getItem('myFunds_V2_HTTPS');
+                    const d = localStorage.getItem('myFunds_V3_AmountMode');
                     if(d) funds.value = JSON.parse(d);
                     else funds.value = [{code:'000001', name:'示例基金', shares:0, gszzl:'0.00', gsz:'1.000'}];
                     
@@ -612,14 +638,13 @@
                     window.addEventListener('resize', () => chartInstance && chartInstance.resize());
                 } catch(e) {
                     console.error("Init error:", e);
-                    alert("初始化失败: " + e.message);
                 }
             });
 
             return {
                 funds, selectedFundCode, searchInput, searchResults, historyData, holdingsData, settings, currentFundEdit, isLightMode, refreshCountdown, isMarketOpen, statusMsg, stockStatusMsg,
                 selectFund, handleSearch, addFund, manualRefresh, saveCurrentFund, removeCurrentFund, toggleTheme, updateFont,
-                totalDailyProfit, totalAssetValue, dailyTotalRate, getSelectedFundName, getSelectedFundVal, getSelectedFundRate
+                totalDailyProfit, totalAssetValue, dailyTotalRate, getSelectedFundName, getSelectedFundVal, getSelectedFundRate, calcProfitRaw, getFundAmount
             };
         }
     }).mount('#app');
