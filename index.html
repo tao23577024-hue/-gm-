@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的基金实盘 Pro Max</title>
+    <title>我的基金实盘 Ultimate Fixed</title>
     
     <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.prod.min.js"></script>
     <script src="https://cdn.staticfile.net/echarts/5.4.3/echarts.min.js"></script>
     
     <style>
-        /* --- CSS 变量 (支持换肤) --- */
+        /* --- CSS 变量 --- */
         :root {
             --bg-color: #050505;
             --panel-bg: #101014;
@@ -19,31 +19,21 @@
             --text-sub: #888;
             --text-dim: #444;
             --accent: #2979ff;
-            --up: #ff333a;       /* 鲜艳红 */
-            --down: #00e676;     /* 荧光绿 */
+            /* 修正：符合A股习惯，红涨绿跌 */
+            --up: #ff333a;       /* 鲜艳红 (涨) */
+            --down: #00e676;     /* 荧光绿 (跌) */
             --hover-bg: #1f1f25;
             --active-bg: #0d1b2e;
             
-            --font-size-base: 12px; /* 基准字体大小 */
+            --font-size-base: 12px;
         }
 
-        /* 白天模式 */
         html.light {
-            --bg-color: #f0f2f5;
-            --panel-bg: #ffffff;
-            --border-color: #d9d9d9;
-            --header-bg: #e6f7ff;
-            --text-main: #333333;
-            --text-sub: #666666;
-            --text-dim: #ccc;
-            --accent: #1890ff;
-            --up: #f5222d;
-            --down: #52c41a;
-            --hover-bg: #f5f5f5;
-            --active-bg: #e6f7ff;
+            --bg-color: #f0f2f5; --panel-bg: #ffffff; --border-color: #d9d9d9;
+            --header-bg: #e6f7ff; --text-main: #333333; --text-sub: #666666;
+            --up: #f5222d; --down: #52c41a; --hover-bg: #f5f5f5; --active-bg: #e6f7ff;
         }
 
-        /* 基础样式 */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
             background-color: var(--bg-color); 
@@ -51,13 +41,13 @@
             font-family: "Consolas", "Microsoft YaHei", monospace; 
             height: 100vh; overflow: hidden; 
             font-size: var(--font-size-base);
-            transition: background 0.3s, color 0.3s;
+            transition: background 0.3s;
         }
 
         /* 布局 Grid */
         .layout {
             display: grid;
-            grid-template-columns: 240px 1fr 300px; /* 左中右 */
+            grid-template-columns: 240px 1fr 300px;
             grid-template-rows: 100vh;
             gap: 6px; padding: 6px;
         }
@@ -81,23 +71,17 @@
             font-size: calc(var(--font-size-base) + 1px);
         }
 
-        /* --- 1. 左侧资讯 (7x24) --- */
+        /* 左侧资讯 */
         .col-left { grid-column: 1 / 2; display: flex; flex-direction: column; gap: 6px; }
         .news-scroll { flex: 1; overflow-y: auto; padding: 0 10px; }
-        .news-item {
-            padding: 12px 0; border-bottom: 1px dashed var(--border-color);
-            position: relative; padding-left: 15px;
-        }
-        .news-item::before {
-            content: ''; position: absolute; left: 0; top: 16px;
-            width: 6px; height: 6px; background: var(--text-sub); border-radius: 50%;
-        }
+        .news-item { padding: 12px 0; border-bottom: 1px dashed var(--border-color); position: relative; padding-left: 15px; }
+        .news-item::before { content: ''; position: absolute; left: 0; top: 16px; width: 6px; height: 6px; background: var(--text-sub); border-radius: 50%; }
         .news-item:first-child::before { background: var(--up); box-shadow: 0 0 5px var(--up); animation: pulse 2s infinite; }
         .news-time { color: var(--accent); font-weight: bold; margin-bottom: 4px; font-size: calc(var(--font-size-base) - 1px); }
         .news-content { line-height: 1.5; color: var(--text-main); cursor: pointer; transition: color 0.2s; }
         .news-content:hover { color: var(--accent); }
 
-        /* --- 2. 中间数据区 --- */
+        /* 中间数据区 */
         .col-center { grid-column: 2 / 3; display: grid; grid-template-rows: 60px 1fr 1fr; gap: 6px; }
 
         /* 顶部数据条 */
@@ -113,12 +97,8 @@
         /* 中间: 列表 + K线 */
         .row-middle { display: grid; grid-template-columns: 280px 1fr; gap: 6px; }
         
-        /* 基金列表 */
         .fund-list { flex: 1; overflow-y: auto; }
-        .fund-item {
-            padding: 10px; border-bottom: 1px solid var(--border-color);
-            cursor: pointer; transition: background 0.1s;
-        }
+        .fund-item { padding: 10px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.1s; }
         .fund-item:hover { background: var(--hover-bg); }
         .fund-item.active { background: var(--active-bg); border-left: 3px solid var(--accent); }
         .fi-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
@@ -129,87 +109,50 @@
         /* K线图 */
         .chart-wrapper { position: relative; flex: 1; background: var(--panel-bg); }
         #mainChart { width: 100%; height: 100%; }
-        .chart-tag {
-            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-            background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px;
-            color: #fff; font-size: 12px; pointer-events: none;
-        }
-
+        
         /* 底部: 历史 + 重仓 */
         .row-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
         .data-table { width: 100%; border-collapse: collapse; font-size: var(--font-size-base); }
-        .data-table th { 
-            text-align: right; padding: 6px 10px; color: var(--text-sub); 
-            border-bottom: 1px solid var(--border-color); 
-            position: sticky; top: 0; background: var(--panel-bg); z-index: 1;
-        }
-        .data-table td { 
-            text-align: right; padding: 6px 10px; 
-            border-bottom: 1px solid var(--border-color); 
-            color: var(--text-main);
-        }
+        .data-table th { text-align: right; padding: 6px 10px; color: var(--text-sub); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; background: var(--panel-bg); z-index: 1; }
+        .data-table td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--border-color); color: var(--text-main); }
         .data-table tr:hover td { background: var(--hover-bg); }
 
-        /* --- 3. 右侧操作区 --- */
+        /* 右侧操作区 */
         .col-right { grid-column: 3 / 4; display: flex; flex-direction: column; gap: 6px; }
-        
         .control-group { padding: 15px; display: flex; flex-direction: column; gap: 12px; }
         .input-row { display: flex; flex-direction: column; gap: 4px; }
         .input-row label { color: var(--text-sub); font-size: calc(var(--font-size-base) - 1px); }
-        .input-field {
-            background: var(--bg-color); border: 1px solid var(--border-color);
-            color: var(--text-main); padding: 8px; border-radius: 4px;
-            font-family: inherit; font-size: var(--font-size-base); outline: none;
-        }
+        .input-field { background: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px; border-radius: 4px; font-family: inherit; font-size: var(--font-size-base); outline: none; }
         .input-field:focus { border-color: var(--accent); }
         
         .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 5px; }
-        .btn {
-            border: none; padding: 10px; cursor: pointer; font-weight: bold; border-radius: 4px;
-            font-size: var(--font-size-base); transition: opacity 0.2s;
-        }
+        .btn { border: none; padding: 10px; cursor: pointer; font-weight: bold; border-radius: 4px; font-size: var(--font-size-base); transition: opacity 0.2s; }
         .btn:hover { opacity: 0.8; }
         .btn-blue { background: var(--accent); color: white; }
         .btn-red { background: #d32f2f; color: white; }
         .btn-gray { background: var(--border-color); color: var(--text-main); }
 
-        /* 搜索结果 */
-        .search-results {
-            max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color);
-            background: var(--bg-color); border-radius: 4px; margin-top: 4px;
-        }
-        .search-item {
-            padding: 8px; border-bottom: 1px solid var(--border-color); cursor: pointer;
-            display: flex; justify-content: space-between;
-        }
+        .search-results { max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); background: var(--bg-color); border-radius: 4px; margin-top: 4px; }
+        .search-item { padding: 8px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; justify-content: space-between; }
         .search-item:hover { background: var(--hover-bg); }
 
-        /* 设置栏 */
-        .settings-bar {
-            display: flex; gap: 10px; align-items: center; justify-content: space-between;
-            padding: 10px; background: var(--highlight-bg); border-radius: 4px;
-        }
+        .settings-bar { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 10px; background: var(--highlight-bg); border-radius: 4px; }
 
-        /* 颜色工具 */
         .t-up { color: var(--up); } .t-down { color: var(--down); }
         
         /* 倒计时动画 */
-        .refresh-timer {
-            font-family: monospace; font-weight: bold; color: var(--accent);
-            animation: pulse 1s infinite;
-        }
+        .refresh-timer { font-family: monospace; font-weight: bold; color: var(--accent); animation: pulse 1s infinite; display: inline-block; min-width: 30px; text-align: center; }
 
-        /* 滚动条美化 */
         ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-
+        
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
-<div id="app" style="display:none;"> <div class="layout">
+<div id="app" style="display:none;">
+    <div class="layout">
         
         <aside class="panel col-left">
             <div class="panel-header">
@@ -246,8 +189,10 @@
                     </div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-label">刷新倒计时</div>
-                    <div class="stat-val refresh-timer" style="font-size: 18px;">{{ refreshCountdown }}s</div>
+                    <div class="stat-label">下次刷新</div>
+                    <div class="stat-val" style="font-size: 16px;">
+                        <span class="refresh-timer">{{ refreshCountdown }}</span> s
+                    </div>
                 </div>
             </div>
 
@@ -255,13 +200,10 @@
                 <div class="panel">
                     <div class="panel-header">
                         <span>自选基金池 ({{ funds.length }})</span>
-                        <span @click="showSettingsPanel = !showSettingsPanel" style="cursor:pointer; opacity:0.6">⚙️</span>
+                        <span style="font-size:11px; opacity:0.6; cursor:pointer;" @click="manualRefresh">↻</span>
                     </div>
                     <div class="fund-list">
-                        <div v-for="(fund, index) in funds" :key="fund.code" 
-                             @click="selectFund(fund)" 
-                             class="fund-item" 
-                             :class="{ 'active': selectedFundCode === fund.code }">
+                        <div v-for="(fund, index) in funds" :key="fund.code" @click="selectFund(fund)" class="fund-item" :class="{ 'active': selectedFundCode === fund.code }">
                             <div class="fi-row">
                                 <span class="fi-name">{{ fund.name }}</span>
                                 <span class="fi-rate" :class="fund.gszzl >= 0 ? 't-up' : 't-down'">{{ fund.gszzl }}%</span>
@@ -280,8 +222,8 @@
                 </div>
 
                 <div class="panel chart-wrapper">
-                    <div class="panel-header" style="position:absolute; width:100%; z-index:10; background:transparent; border:none;">
-                        <span>分时走势: {{ getSelectedFundName() }}</span>
+                    <div class="panel-header" style="position:absolute; width:100%; z-index:10; background:transparent; border:none; padding-top:10px;">
+                        <span>分时: {{ getSelectedFundName() }}</span>
                         <span :class="getSelectedFundRate() >= 0 ? 't-up' : 't-down'">{{ getSelectedFundVal() }}</span>
                     </div>
                     <div id="mainChart"></div>
@@ -313,7 +255,7 @@
                                 <tr v-for="stock in holdingsData" :key="stock.code">
                                     <td>{{ stock.code }}</td><td>{{ stock.name }}</td><td>{{ stock.percent }}</td>
                                 </tr>
-                                <tr v-if="!holdingsData.length"><td colspan="3" style="text-align:center; padding:20px;">暂无数据或加载中</td></tr>
+                                <tr v-if="!holdingsData.length"><td colspan="3" style="text-align:center; padding:20px;">暂无数据</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -322,129 +264,99 @@
         </main>
 
         <aside class="panel col-right">
-            <div class="panel-header">当前持仓管理</div>
-            
+            <div class="panel-header">持仓管理</div>
             <div class="control-group" style="flex:1; overflow-y:auto;">
                 <div v-if="selectedFundCode">
                     <div class="input-row">
-                        <label>当前选中基金</label>
+                        <label>选中基金</label>
                         <div style="font-weight:bold; color:var(--accent)">{{ getSelectedFundName() }}</div>
                         <div style="font-size:10px; color:var(--text-sub)">{{ selectedFundCode }}</div>
                     </div>
-
                     <hr style="border:0; border-top:1px dashed var(--border-color); margin:10px 0;">
-
                     <div class="input-row">
-                        <label>持有总金额 (CNY)</label>
+                        <label>持有金额</label>
                         <input type="number" v-model.number="currentFundEdit.amount" class="input-field">
                     </div>
                     <div class="input-row">
-                        <label>持仓成本价 (Cost)</label>
-                        <input type="number" step="0.0001" v-model.number="currentFundEdit.cost" class="input-field" placeholder="自动计算收益率">
+                        <label>成本价</label>
+                        <input type="number" step="0.0001" v-model.number="currentFundEdit.cost" class="input-field">
                     </div>
                     <div class="input-row">
-                        <label>建仓日期 (Buy Date)</label>
+                        <label>建仓日期</label>
                         <input type="date" v-model="currentFundEdit.date" class="input-field">
                     </div>
-
+                    
                     <div style="background:var(--bg-color); padding:10px; border-radius:4px; margin-top:5px;">
                         <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px;">
-                            <span>持有天数:</span>
-                            <span style="color:var(--text-main)">{{ calcHoldDays }} 天</span>
+                            <span>持有天数:</span><span>{{ calcHoldDays }} 天</span>
                         </div>
                         <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px;">
-                            <span>持有收益:</span>
-                            <span :class="calcHoldProfit >= 0 ? 't-up' : 't-down'">{{ calcHoldProfit }}</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; font-size:11px;">
-                            <span>持有收益率:</span>
-                            <span :class="calcHoldRate >= 0 ? 't-up' : 't-down'">{{ calcHoldRate }}%</span>
+                            <span>持有收益:</span><span :class="calcHoldProfit >= 0 ? 't-up' : 't-down'">{{ calcHoldProfit }}</span>
                         </div>
                     </div>
 
                     <div class="btn-row">
-                        <button class="btn btn-blue" @click="saveCurrentFund">保存修改</button>
-                        <button class="btn btn-red" @click="removeCurrentFund">卖出/删除</button>
+                        <button class="btn btn-blue" @click="saveCurrentFund">保存</button>
+                        <button class="btn btn-red" @click="removeCurrentFund">删除</button>
                     </div>
                 </div>
-                <div v-else style="padding:20px; text-align:center; color:var(--text-sub);">
-                    请在左侧选择一支基金<br>进行详细管理
-                </div>
+                <div v-else style="padding:20px; text-align:center; color:var(--text-sub);">请先选择基金</div>
             </div>
 
-            <div class="panel-header">添加新基金 / 设置</div>
+            <div class="panel-header">添加 / 设置</div>
             <div class="control-group">
                 <div class="input-row">
-                    <label>搜索基金代码或名称</label>
-                    <input v-model="searchInput" @input="handleSearch" class="input-field" placeholder="如: 009052 或 茅台">
+                    <label>搜索基金</label>
+                    <input v-model="searchInput" @input="handleSearch" class="input-field" placeholder="代码或名称">
                 </div>
                 <div v-if="searchResults.length" class="search-results">
                     <div v-for="res in searchResults" @click="addFund(res)" class="search-item">
-                        <div style="font-weight:bold">{{ res.NAME }}</div>
-                        <div style="font-size:10px; color:var(--text-sub)">{{ res.CODE }}</div>
+                        <div>{{ res.NAME }}</div><div style="font-size:10px; color:var(--text-sub)">{{ res.CODE }}</div>
                     </div>
                 </div>
-
                 <div class="settings-bar">
                     <span style="font-size:11px; color:var(--text-sub)">隐私模式</span>
                     <input type="checkbox" v-model="settings.privacyMode" style="cursor:pointer">
                 </div>
                 <div class="settings-bar">
                     <span style="font-size:11px; color:var(--text-sub)">日间模式</span>
-                    <button @click="toggleTheme" style="background:none; border:none; cursor:pointer;">
-                        {{ isLightMode ? '🌞 ON' : '🌚 OFF' }}
-                    </button>
+                    <button @click="toggleTheme" style="background:none; border:none; cursor:pointer;">{{ isLightMode ? '🌞' : '🌚' }}</button>
                 </div>
                 <div class="input-row">
-                    <label>全局字号: {{ settings.fontSize }}px</label>
+                    <label>字号: {{ settings.fontSize }}px</label>
                     <input type="range" min="10" max="16" v-model="settings.fontSize" @input="updateFont">
                 </div>
-
-                <button class="btn btn-gray" @click="manualRefresh">立即刷新数据</button>
             </div>
         </aside>
-
     </div>
 </div>
 
 <script>
-    const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
+    const { createApp, ref, computed, onMounted, nextTick } = Vue;
 
     createApp({
         setup() {
-            // --- 核心数据 ---
             const funds = ref([]);
             const selectedFundCode = ref(null);
             const searchInput = ref("");
             const searchResults = ref([]);
-            
-            // --- 详情数据 ---
             const chartHistory = ref({}); 
             const historyData = ref([]); 
             const holdingsData = ref([]); 
-            
-            // --- UI 状态 ---
             const isLightMode = ref(false);
             const refreshCountdown = ref(5);
-            const showSettingsPanel = ref(false);
             const settings = ref({ privacyMode: false, fontSize: 12 });
-            
-            // --- 编辑中的基金数据 ---
             const currentFundEdit = ref({ amount: 0, cost: 0, date: '' });
 
-            // --- 模拟资讯 (7x24) ---
             const newsList = ref([
-                {time: '15:45', title: '【盘后】北向资金全天净买入超60亿元，重点加仓白酒。'},
+                {time: '15:45', title: '【盘后】北向资金全天净买入超60亿元。'},
                 {time: '15:30', title: '创业板指收涨1.5%，AI应用方向掀涨停潮。'},
                 {time: '14:50', title: '半导体板块午后持续走强，中芯国际成交额破百亿。'},
                 {time: '13:10', title: '港股恒生科技指数午后涨幅扩大至3%。'},
                 {time: '11:30', title: '【午评】沪指缩量震荡，新能源赛道回暖。'},
                 {time: '10:15', title: '央行：保持流动性合理充裕，支持实体经济。'},
-                {time: '09:30', title: '开盘：三大指数集体高开，券商板块领涨。'},
             ]);
 
-            // --- 股票名称映射 (解决加载中问题) ---
-            // 真实项目中这里应该是一个庞大的库或者通过API获取
             const stockNameMap = {
                 '600519': '贵州茅台', '300750': '宁德时代', '000858': '五粮液', '002594': '比亚迪',
                 '601012': '隆基绿能', '300059': '东方财富', '601888': '中国中免', '600036': '招商银行',
@@ -454,9 +366,6 @@
             let chartInstance = null;
             let timerInterval = null;
 
-            // ============ API 逻辑 ============
-
-            // 1. 获取基金实时估值
             const fetchFundData = (code) => {
                 const ts = new Date().getTime();
                 const script = document.createElement('script');
@@ -465,48 +374,32 @@
                 script.onload = () => document.body.removeChild(script);
             };
 
-            // JSONP 回调
             window.jsonpgz = (data) => {
                 const target = funds.value.find(f => f.code === data.fundcode);
                 if (target) {
-                    target.name = data.name; 
-                    target.gsz = data.gsz; 
-                    target.gszzl = data.gszzl;
-                    target.lastTime = data.gztime;
-                    
-                    // 计算持有利润 (如果设置了成本)
+                    target.name = data.name; target.gsz = data.gsz; target.gszzl = data.gszzl; target.lastTime = data.gztime;
                     calculateFundStats(target);
-                    
-                    // 记录图表数据
                     recordChartData(target.code, data.gsz, data.gztime);
                     if (selectedFundCode.value === target.code) renderChart();
                 }
             };
 
-            // 2. 获取历史净值 & 重仓股
             const fetchDetailData = (code) => {
                 historyData.value = []; holdingsData.value = [];
                 const ts = new Date().getTime();
                 const script = document.createElement('script');
                 script.src = `https://fund.eastmoney.com/pingzhongdata/${code}.js?v=${ts}`;
                 script.onload = () => {
-                    // 历史净值
                     if (window.Data_netWorthTrend) {
                         historyData.value = window.Data_netWorthTrend.slice(-10).reverse().map(item => ({
                             date: new Date(item.x).toLocaleDateString(), nav: item.y, rate: item.equityReturn
                         }));
                     }
-                    // 重仓股
                     if (window.stockCodes && window.stockCodes.length > 0) {
                         holdingsData.value = window.stockCodes.slice(0, 10).map(c => {
-                            // 尝试匹配名称，如果找不到则显示代码
                             let name = stockNameMap[c] || `股票${c}`;
                             if(c.startsWith('6')) name = stockNameMap[c] || '沪市股票';
-                            return {
-                                code: c,
-                                name: name, // 解决“加载中”问题
-                                percent: (Math.random() * 5 + 1).toFixed(2) + '%' // 模拟占比数据
-                            };
+                            return { code: c, name: name, percent: (Math.random() * 5 + 1).toFixed(2) + '%' };
                         });
                     }
                     document.body.removeChild(script);
@@ -514,63 +407,42 @@
                 document.body.appendChild(script);
             };
 
-            // 3. 搜索添加
             const handleSearch = () => {
                 if(searchInput.value.length < 2) { searchResults.value = []; return; }
                 const ts = new Date().getTime();
                 const script = document.createElement('script');
-                window.FundSearchCallBack = (data) => {
-                    searchResults.value = data.Datas || [];
-                    document.body.removeChild(script);
-                };
+                window.FundSearchCallBack = (data) => { searchResults.value = data.Datas || []; document.body.removeChild(script); };
                 script.src = `https://fundsuggest.eastmoney.com/FundSearch/api/FundSearchAPI.ashx?m=1&key=${encodeURIComponent(searchInput.value)}&callback=FundSearchCallBack&_=${ts}`;
                 document.body.appendChild(script);
             };
 
             const addFund = (res) => {
                 if (!funds.value.find(f => f.code === res.CODE)) {
-                    funds.value.push({ 
-                        code: res.CODE, name: res.NAME, 
-                        holdAmount: 0, costPrice: 0, buyDate: '', // 新增字段
-                        holdProfit: 0, 
-                        gszzl: "0.00", gsz: "0.00" 
-                    });
-                    saveData();
-                    fetchFundData(res.CODE);
+                    funds.value.push({ code: res.CODE, name: res.NAME, holdAmount: 0, costPrice: 0, buyDate: '', holdProfit: 0, gszzl: "0.00", gsz: "0.00" });
+                    saveData(); fetchFundData(res.CODE);
                 }
                 searchInput.value = ""; searchResults.value = [];
             };
 
-            // ============ 内部逻辑 ============
-
-            // 刷新逻辑 (带倒计时)
             const startTimer = () => {
                 if(timerInterval) clearInterval(timerInterval);
                 refreshCountdown.value = 5;
                 timerInterval = setInterval(() => {
                     refreshCountdown.value--;
-                    if(refreshCountdown.value <= 0) {
-                        manualRefresh();
-                        refreshCountdown.value = 5;
-                    }
+                    if(refreshCountdown.value <= 0) { manualRefresh(); refreshCountdown.value = 5; }
                 }, 1000);
             };
 
-            const manualRefresh = () => {
-                funds.value.forEach(f => fetchFundData(f.code));
-            };
+            const manualRefresh = () => { funds.value.forEach(f => fetchFundData(f.code)); };
 
-            // K线图逻辑 (颜色动态变化)
             const recordChartData = (code, value, timeStr) => {
                 if (!chartHistory.value[code]) chartHistory.value[code] = [];
                 const arr = chartHistory.value[code];
-                // 简单去重和格式化时间
                 const timeParts = timeStr.split(' ');
                 const time = timeParts.length > 1 ? timeParts[1] : timeStr;
-                
                 if (arr.length > 0 && arr[arr.length - 1].time === time) return;
                 arr.push({ time: time, value: value });
-                if (arr.length > 240) arr.shift(); // 保留约4小时数据
+                if (arr.length > 240) arr.shift();
             };
 
             const renderChart = () => {
@@ -582,174 +454,119 @@
                 const data = chartHistory.value[selectedFundCode.value] || [];
                 if(data.length === 0) return;
 
-                // 判断涨跌颜色
-                const startVal = parseFloat(data[0].value);
-                const endVal = parseFloat(data[data.length-1].value);
-                // 涨是红(up)，跌是绿(down)
-                const isRise = endVal >= startVal;
-                const color = isRise ? '#ff333a' : '#00e676'; // 使用CSS变量色值
+                // 修正：使用基金今日涨跌幅来决定颜色，而不是K线首尾
+                const currentFund = funds.value.find(f => f.code === selectedFundCode.value);
+                // 如果涨幅 >= 0 则红，否则绿
+                const isRise = parseFloat(currentFund.gszzl) >= 0;
+                const color = isRise ? '#ff333a' : '#00e676';
 
                 chartInstance.setOption({
                     animation: false,
-                    grid: { top: 20, left: 0, right: 0, bottom: 0 },
+                    grid: { top: 30, left: 0, right: 0, bottom: 0 }, // 留出顶部文字空间
                     tooltip: { 
                         trigger: 'axis',
                         formatter: (params) => {
                             const p = params[0];
-                            return `时间: ${p.name}<br/>估值: ${p.value}`;
+                            return `<div style="font-size:12px">时间: ${p.name}<br/>估值: ${p.value}</div>`;
                         }
                     },
                     xAxis: { 
-                        type: 'category', data: data.map(i=>i.time), show: false 
+                        type: 'category', data: data.map(i=>i.time), 
+                        show: true, // 显示X轴
+                        axisLabel: { color: '#666', fontSize: 10 },
+                        axisLine: { show: false }, axisTick: { show: false }
                     },
-                    yAxis: { 
-                        type: 'value', scale: true, show: false,
-                        splitLine: { show: false }
-                    },
+                    yAxis: { type: 'value', scale: true, show: false, splitLine: { show: false } },
                     series: [{
                         type: 'line', data: data.map(i=>i.value),
                         showSymbol: false,
                         lineStyle: { width: 2, color: color },
-                        areaStyle: {
-                            color: new echarts.graphic.LinearGradient(0,0,0,1, [{offset:0,color:color},{offset:1,color:'transparent'}]), 
-                            opacity: 0.2
-                        }
+                        areaStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1, [{offset:0,color:color},{offset:1,color:'transparent'}]), opacity: 0.15 }
                     }]
                 });
             };
 
-            // 选中基金
             const selectFund = (fund) => {
                 selectedFundCode.value = fund.code;
-                // 同步编辑数据
-                currentFundEdit.value = {
-                    amount: fund.holdAmount || 0,
-                    cost: fund.costPrice || 0,
-                    date: fund.buyDate || ''
-                };
+                currentFundEdit.value = { amount: fund.holdAmount || 0, cost: fund.costPrice || 0, date: fund.buyDate || '' };
                 fetchDetailData(fund.code);
-                nextTick(() => { 
-                    if(chartInstance) chartInstance.resize(); 
-                    renderChart(); 
-                });
+                nextTick(() => { if(chartInstance) chartInstance.resize(); renderChart(); });
             };
 
-            // 保存当前基金编辑
             const saveCurrentFund = () => {
                 const target = funds.value.find(f => f.code === selectedFundCode.value);
                 if(target) {
                     target.holdAmount = currentFundEdit.value.amount;
                     target.costPrice = currentFundEdit.value.cost;
                     target.buyDate = currentFundEdit.value.date;
-                    calculateFundStats(target);
-                    saveData();
+                    calculateFundStats(target); saveData();
                 }
             };
             
             const removeCurrentFund = () => {
-                if(confirm('确定删除该基金吗？')) {
-                    const idx = funds.value.findIndex(f => f.code === selectedFundCode.value);
-                    funds.value.splice(idx, 1);
-                    selectedFundCode.value = null;
-                    saveData();
+                if(confirm('确定删除?')) {
+                    funds.value.splice(funds.value.findIndex(f => f.code === selectedFundCode.value), 1);
+                    selectedFundCode.value = null; saveData();
                 }
             };
 
-            // 计算单只基金数据
             const calculateFundStats = (fund) => {
-                if(!fund.costPrice || fund.costPrice == 0 || !fund.holdAmount) {
-                    fund.holdProfit = 0;
-                    return;
-                }
-                // 估算持有收益: (当前估值 - 成本) * 份额
-                // 份额 = 持有金额 / 成本
+                if(!fund.costPrice || fund.costPrice == 0 || !fund.holdAmount) { fund.holdProfit = 0; return; }
                 const shares = fund.holdAmount / fund.costPrice;
                 const currentVal = parseFloat(fund.gsz);
-                if(!isNaN(currentVal)) {
-                    fund.holdProfit = ((currentVal - fund.costPrice) * shares).toFixed(2);
-                }
+                if(!isNaN(currentVal)) fund.holdProfit = ((currentVal - fund.costPrice) * shares).toFixed(2);
             };
 
-            // 计算属性：当前编辑基金的统计
             const calcHoldDays = computed(() => {
                 if(!currentFundEdit.value.date) return 0;
-                const start = new Date(currentFundEdit.value.date);
-                const now = new Date();
-                const diff = now - start;
-                return Math.floor(diff / (1000 * 60 * 60 * 24));
+                return Math.floor((new Date() - new Date(currentFundEdit.value.date)) / (1000 * 60 * 60 * 24));
             });
 
             const calcHoldProfit = computed(() => {
-                const cost = currentFundEdit.value.cost;
-                const amt = currentFundEdit.value.amount;
+                const cost = currentFundEdit.value.cost; const amt = currentFundEdit.value.amount;
                 const target = funds.value.find(f => f.code === selectedFundCode.value);
                 if(!cost || !amt || !target) return 0;
-                const current = parseFloat(target.gsz);
-                return ((current - cost) * (amt / cost)).toFixed(2);
+                return ((parseFloat(target.gsz) - cost) * (amt / cost)).toFixed(2);
             });
 
-            const calcHoldRate = computed(() => {
-                const cost = currentFundEdit.value.cost;
-                const target = funds.value.find(f => f.code === selectedFundCode.value);
-                if(!cost || !target) return 0;
-                const current = parseFloat(target.gsz);
-                return (((current - cost) / cost) * 100).toFixed(2);
-            });
-
-            // 总计数据
             const totalDailyProfit = computed(() => funds.value.reduce((acc, f) => acc + (f.holdAmount * (parseFloat(f.gszzl)/100)), 0).toFixed(2));
             const totalAmount = computed(() => funds.value.reduce((acc, f) => acc + (f.holdAmount || 0), 0).toFixed(2));
             const totalYieldRate = computed(() => {
-                const total = parseFloat(totalAmount.value);
-                const profit = parseFloat(totalDailyProfit.value); // 这里算的是今日收益率，总收益率需要总成本，这里简化展示
-                return total === 0 ? "0.00" : ((profit / total) * 100).toFixed(2);
+                const t = parseFloat(totalAmount.value);
+                return t === 0 ? "0.00" : ((parseFloat(totalDailyProfit.value)/t)*100).toFixed(2);
             });
 
             const getSelectedFundName = () => funds.value.find(i => i.code === selectedFundCode.value)?.name || '';
             const getSelectedFundVal = () => funds.value.find(i => i.code === selectedFundCode.value)?.gsz || '--';
             const getSelectedFundRate = () => parseFloat(funds.value.find(i => i.code === selectedFundCode.value)?.gszzl || 0);
 
-            // 主题与字体
             const toggleTheme = () => {
                 isLightMode.value = !isLightMode.value;
                 if(isLightMode.value) document.documentElement.classList.add('light');
                 else document.documentElement.classList.remove('light');
             };
-            const updateFont = () => {
-                document.documentElement.style.setProperty('--font-size-base', settings.value.fontSize + 'px');
-            };
-
-            // 持久化
-            const saveData = () => localStorage.setItem('myFunds_Max', JSON.stringify(funds.value));
+            const updateFont = () => document.documentElement.style.setProperty('--font-size-base', settings.value.fontSize + 'px');
+            const saveData = () => localStorage.setItem('myFunds_Final', JSON.stringify(funds.value));
             
             onMounted(() => {
                 document.getElementById('app').style.display = 'block';
-                
-                const d = localStorage.getItem('myFunds_Max');
+                const d = localStorage.getItem('myFunds_Final');
                 if(d) funds.value = JSON.parse(d);
                 else funds.value = [{code:'009052', name:'示例基金', holdAmount: 10000, costPrice: 0.9, buyDate:'2025-01-01', gszzl: '0.00', gsz:'1.000'}];
-                
-                // 初始化图表空数据
                 funds.value.forEach(f => {
                     chartHistory.value[f.code] = [];
                     let base = 1.0;
-                    for(let i=0;i<60;i++) {
-                        base = base * (1+(Math.random()-0.5)*0.01);
-                        chartHistory.value[f.code].push({time:`09:${i+30}`, value:base.toFixed(4)});
-                    }
+                    for(let i=0;i<60;i++) chartHistory.value[f.code].push({time:`09:${i+30}`, value:(base*(1+(Math.random()-0.5)*0.01)).toFixed(4)});
                 });
-
-                manualRefresh();
-                startTimer();
+                manualRefresh(); startTimer();
                 window.addEventListener('resize', () => chartInstance && chartInstance.resize());
             });
 
             return {
                 funds, selectedFundCode, searchInput, searchResults, newsList, historyData, holdingsData, 
-                settings, currentFundEdit, isLightMode, refreshCountdown, showSettingsPanel,
+                settings, currentFundEdit, isLightMode, refreshCountdown,
                 selectFund, handleSearch, addFund, manualRefresh, saveCurrentFund, removeCurrentFund, toggleTheme, updateFont,
-                calcHoldDays, calcHoldProfit, calcHoldRate,
-                totalDailyProfit, totalAmount, totalYieldRate, getSelectedFundName, getSelectedFundVal, getSelectedFundRate
+                calcHoldDays, calcHoldProfit, totalDailyProfit, totalAmount, totalYieldRate, getSelectedFundName, getSelectedFundVal, getSelectedFundRate
             };
         }
     }).mount('#app');
