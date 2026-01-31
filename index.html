@@ -3,128 +3,156 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>基金持仓监控看板</title>
+    <title>基金持仓监控看板 - 修正版</title>
     <style>
-        /* 全局深色主题设置 */
-        body {
-            background-color: #0d1117;
-            color: #c9d1d9;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            height: 100vh;
+        /* --- 全局重置 --- */
+        * {
             box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
+        body {
+            background-color: #06080a; /* 极深色背景，接近黑色 */
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            padding: 20px;
+        }
+
+        /* --- 布局容器 --- */
         .dashboard-container {
             display: grid;
-            grid-template-columns: 1fr 1fr 300px; /* 左中右三栏布局 */
-            gap: 10px;
-            width: 100%;
-            max-width: 1600px;
-            height: 90vh;
+            grid-template-columns: 32% 32% 1fr; /* 左右比例微调，右侧自适应 */
+            gap: 15px;
+            height: 95vh;
+            max-width: 1800px;
+            margin: 0 auto;
         }
 
-        /* 卡片通用样式 */
+        /* --- 卡片通用样式 --- */
         .card {
-            background-color: #0b0e14;
-            border: 1px solid #1f2531;
-            border-radius: 4px;
+            background-color: #0b1016; /* 深蓝黑色卡片背景 */
+            border: 1px solid #1c2128;
+            border-radius: 2px;
             display: flex;
             flex-direction: column;
             overflow: hidden;
         }
 
+        /* --- 标题栏样式 (还原左侧蓝条) --- */
         .card-header {
-            background-color: #0f1623;
-            padding: 10px 15px;
-            font-weight: bold;
-            color: #58a6ff;
-            border-bottom: 1px solid #1f2531;
-            border-left: 4px solid #1f6feb;
-            font-size: 16px;
-        }
-
-        /* 表格样式 */
-        .data-table {
-            width: 100%;
-            border-collapse: collapse;
+            background-color: #0b1016;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            border-bottom: 1px solid #1c2128;
+            position: relative;
             font-size: 14px;
+            font-weight: 600;
+            color: #5aa1ff; /* 标题文字淡蓝色 */
         }
 
-        .data-table th {
-            text-align: right;
-            padding: 12px;
+        /* 左侧蓝色竖条装饰 */
+        .card-header::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 10px;
+            bottom: 10px;
+            width: 3px;
+            background-color: #1e80ff; /* 亮蓝色竖条 */
+        }
+
+        .header-title {
+            flex-grow: 1;
+        }
+
+        .header-source {
+            font-size: 12px;
             color: #8b949e;
             font-weight: normal;
-            border-bottom: 1px solid #21262d;
-        }
-        
-        /* 表头第一列左对齐 */
-        .data-table th:first-child, .data-table td:first-child {
-            text-align: left; /* 或者是 center，看你喜好 */
-            padding-left: 20px;
         }
 
-        .data-table td {
+        /* --- 表格区域 --- */
+        .table-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th {
             text-align: right;
-            padding: 10px 12px;
-            border-bottom: 1px solid #161b22;
+            padding: 12px 15px;
+            color: #8b949e; /* 表头灰色 */
+            font-weight: normal;
+            position: sticky;
+            top: 0;
+            background-color: #0b1016; /* 固定表头背景 */
+            border-bottom: 1px solid #252b36;
         }
 
-        .data-table tr:hover {
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #161b22;
+            color: #c9d1d9;
+            text-align: right; /* 默认数字右对齐 */
+        }
+
+        /* 斑马纹或Hover效果，截图看起来比较纯净，这里加个微弱的hover */
+        tr:hover td {
             background-color: #161b22;
         }
 
-        /* 颜色类：红涨绿跌 */
-        .trend-up {
+        /* 特殊列对齐修正 */
+        .col-left { text-align: left; }
+        .col-center { text-align: center; }
+        
+        /* 股票代码样式 */
+        .stock-code {
+            color: #8b949e; /* 代码显示为灰色 */
+            font-family: monospace; /* 等宽字体 */
+            background: rgba(255,255,255,0.05);
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+
+        /* --- 涨跌颜色 (核心修改) --- */
+        .color-up {
             color: #ff4d4f; /* 红色 */
         }
-        
-        .trend-down {
+        .color-down {
             color: #2cbe4e; /* 绿色 */
         }
 
-        /* 股票代码样式 */
-        .stock-code {
-            background-color: #21262d;
-            padding: 2px 6px;
-            border-radius: 4px;
-            color: #8b949e;
-            font-family: monospace;
-        }
-
-        /* 金十数据侧边栏样式 */
-        .news-container {
-            padding: 0;
-            overflow-y: auto;
-            height: 100%;
-        }
-
-        .news-iframe-placeholder {
+        /* --- 右侧快讯样式 --- */
+        .news-frame {
             width: 100%;
             height: 100%;
             border: none;
+            background-color: #fff; /* iframe内部保持白色，还原截图效果 */
         }
-
-        /* 自定义滚动条 */
+        
+        /* 自定义滚动条样式 */
         ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
+            width: 6px;
+            height: 6px;
         }
         ::-webkit-scrollbar-track {
-            background: #0d1117; 
+            background: #0b1016; 
         }
         ::-webkit-scrollbar-thumb {
             background: #30363d; 
-            border-radius: 4px;
+            border-radius: 3px;
         }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #58a6ff; 
-        }
-
     </style>
 </head>
 <body>
@@ -132,12 +160,14 @@
     <div class="dashboard-container">
         
         <div class="card">
-            <div class="card-header">历史净值 (近10日)</div>
-            <div style="overflow-y: auto;">
-                <table class="data-table" id="historyTable">
+            <div class="card-header">
+                <span class="header-title">历史净值 (近10日)</span>
+            </div>
+            <div class="table-container">
+                <table id="historyTable">
                     <thead>
                         <tr>
-                            <th>日期</th>
+                            <th class="col-left">日期</th>
                             <th>净值</th>
                             <th>日涨幅</th>
                         </tr>
@@ -149,13 +179,15 @@
         </div>
 
         <div class="card">
-            <div class="card-header">前十大重仓股</div>
-            <div style="overflow-y: auto;">
-                <table class="data-table" id="stockTable">
+            <div class="card-header">
+                <span class="header-title">前十大重仓股</span>
+            </div>
+            <div class="table-container">
+                <table id="stockTable">
                     <thead>
                         <tr>
-                            <th style="text-align: center;">代码</th>
-                            <th style="text-align: left;">名称</th>
+                            <th class="col-center">代码</th>
+                            <th class="col-center">名称</th>
                             <th>占比</th>
                         </tr>
                     </thead>
@@ -166,106 +198,75 @@
         </div>
 
         <div class="card">
-            <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
-                <span>7x24小时快讯</span>
-                <span style="font-size:12px; color:#8b949e;">来源: 金十数据</span>
+            <div class="card-header">
+                <span class="header-title">7x24小时快讯</span>
+                <span class="header-source">来源：金十数据</span>
             </div>
-            <div class="news-container">
-                <iframe src="https://wallstreetcn.com/live/global" class="news-iframe-placeholder" title="实时快讯"></iframe>
-                
-                </div>
+            <iframe src="https://wallstreetcn.com/live/global" class="news-frame" title="Live News"></iframe>
         </div>
 
     </div>
 
 <script>
-    // 1. 历史净值数据 (模拟你截图中的数据)
+    // --- 1. 历史净值数据 (完全对应截图数据) ---
     const historyData = [
-        { date: '2026/1/30', value: 2.5909, change: -5.41 },
-        { date: '2026/1/29', value: 2.7391, change: 2.05 },
-        { date: '2026/1/28', value: 2.6842, change: 6.52 },
-        { date: '2026/1/27', value: 2.5199, change: 1.72 },
-        { date: '2026/1/26', value: 2.4774, change: 7.91 },
-        { date: '2026/1/23', value: 2.2957, change: 1.87 },
-        { date: '2026/1/22', value: 2.2536, change: -0.56 },
-        { date: '2026/1/21', value: 2.2664, change: 5.60 },
-        { date: '2026/1/20', value: 2.1463, change: 2.98 },
-        { date: '2026/1/19', value: 2.0841, change: 2.86 },
+        { date: '2026/1/30', val: '2.5909', rate: -5.41 },
+        { date: '2026/1/29', val: '2.7391', rate: 2.05 },
+        { date: '2026/1/28', val: '2.6842', rate: 6.52 },
+        { date: '2026/1/27', val: '2.5199', rate: 1.72 },
+        { date: '2026/1/26', val: '2.4774', rate: 7.91 },
+        { date: '2026/1/23', val: '2.2957', rate: 1.87 },
+        { date: '2026/1/22', val: '2.2536', rate: -0.56 },
+        { date: '2026/1/21', val: '2.2664', rate: 5.60 },
+        { date: '2026/1/20', val: '2.1463', rate: 2.98 },
+        { date: '2026/1/19', val: '2.0841', rate: 2.86 },
     ];
 
-    // 2. 股票映射表 (根据截图中的黄金/矿业股代码修正名称)
-    // 你的截图代码看起来有7位(如6005471)，通常最后一位是市场标识(1=沪, 2=深等)或仅仅是多余的。
-    // 这里我做了模糊匹配，只要包含这6位核心代码就显示对应名称。
-    const stockMap = {
-        '600547': '山东黄金',
-        '600489': '中金黄金',
-        '600988': '赤峰黄金',
-        '002237': '恒邦股份',
-        '601899': '紫金矿业',
-        '601069': '西部黄金',
-        '000975': '银泰黄金', // 现名 山金国际
-        '002155': '湖南黄金',
-        '000603': '盛达资源',
-        '000426': '兴业银锡'
-    };
-
+    // --- 2. 股票数据 (完全对应截图中的黄金/矿业股) ---
     const stockData = [
-        { code: '6005471', percent: '2.91%' },
-        { code: '6004891', percent: '3.59%' },
-        { code: '6009881', percent: '3.59%' },
-        { code: '0022370', percent: '1.37%' },
-        { code: '6018991', percent: '4.31%' },
-        { code: '6010691', percent: '2.07%' },
-        { code: '0009750', percent: '5.95%' },
-        { code: '0021550', percent: '1.39%' },
-        { code: '0006030', percent: '1.63%' },
-        { code: '0004260', percent: '4.64%' },
+        { code: '600547', name: '山东黄金', percent: '2.91%' },
+        { code: '600489', name: '中金黄金', percent: '3.59%' },
+        { code: '600988', name: '赤峰黄金', percent: '3.59%' },
+        { code: '002237', name: '恒邦股份', percent: '1.37%' },
+        { code: '601899', name: '紫金矿业', percent: '4.31%' },
+        { code: '601069', name: '西部黄金', percent: '2.07%' },
+        { code: '000975', name: '银泰黄金', percent: '5.95%' }, // 截图显示银泰黄金
+        { code: '002155', name: '湖南黄金', percent: '1.39%' },
+        { code: '000603', name: '盛达资源', percent: '1.63%' },
+        { code: '000426', name: '兴业银锡', percent: '4.64%' },
     ];
 
-    // 渲染历史净值
-    function renderHistory() {
-        const tbody = document.querySelector('#historyTable tbody');
-        let html = '';
-        historyData.forEach(item => {
-            // 判断颜色：负数为绿，正数为红
-            const colorClass = item.change < 0 ? 'trend-down' : 'trend-up';
-            // 格式化百分比，自动补加号
-            const sign = item.change > 0 ? '+' : '';
-            
-            html += `
-                <tr>
-                    <td style="text-align: left; padding-left: 20px;">${item.date}</td>
-                    <td>${item.value.toFixed(4)}</td>
-                    <td class="${colorClass}">${sign}${item.change}%</td>
-                </tr>
-            `;
-        });
-        tbody.innerHTML = html;
-    }
+    // 渲染历史表格
+    const historyTbody = document.querySelector('#historyTable tbody');
+    let historyHtml = '';
+    historyData.forEach(item => {
+        const isUp = item.rate > 0;
+        const colorClass = isUp ? 'color-up' : 'color-down';
+        const sign = isUp ? '+' : ''; // 正数加号
+        
+        historyHtml += `
+            <tr>
+                <td class="col-left">${item.date}</td>
+                <td>${item.val}</td>
+                <td class="${colorClass}">${sign}${item.rate}%</td>
+            </tr>
+        `;
+    });
+    historyTbody.innerHTML = historyHtml;
 
-    // 渲染重仓股
-    function renderStocks() {
-        const tbody = document.querySelector('#stockTable tbody');
-        let html = '';
-        stockData.forEach(item => {
-            // 提取核心6位代码进行匹配名称
-            const coreCode = item.code.substring(0, 6);
-            const name = stockMap[coreCode] || '未知股票';
-            
-            html += `
-                <tr>
-                    <td style="text-align: center;"><span class="stock-code">${coreCode}</span></td>
-                    <td style="text-align: left;">${name}</td>
-                    <td>${item.percent}</td>
-                </tr>
-            `;
-        });
-        tbody.innerHTML = html;
-    }
-
-    // 初始化
-    renderHistory();
-    renderStocks();
+    // 渲染股票表格
+    const stockTbody = document.querySelector('#stockTable tbody');
+    let stockHtml = '';
+    stockData.forEach(item => {
+        stockHtml += `
+            <tr>
+                <td class="col-center"><span class="stock-code">${item.code}</span></td>
+                <td class="col-center">${item.name}</td>
+                <td>${item.percent}</td>
+            </tr>
+        `;
+    });
+    stockTbody.innerHTML = stockHtml;
 
 </script>
 </body>
