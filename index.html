@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的基金实盘 - 紧凑版</title>
+    <title>我的基金实盘 - 终极版</title>
     
     <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.prod.min.js"></script>
     <script src="https://cdn.staticfile.net/echarts/5.4.3/echarts.min.js"></script>
@@ -44,7 +44,7 @@
             display: grid;
             /* 左(列表) | 中(图表数据) | 右(紧凑操作) */
             grid-template-columns: 220px 1fr 200px; 
-            grid-template-rows: 60px 1fr; /* 顶栏 + 内容 */
+            grid-template-rows: 60px minmax(0, 1fr); /* 关键：minmax防止溢出 */
             gap: 4px; padding: 4px;
             height: 100vh;
         }
@@ -90,55 +90,60 @@
         .col-center { 
             grid-row: 2 / 3; grid-column: 2 / 3; 
             display: grid; grid-template-rows: 2fr 1fr; gap: 4px; /* 图表占2/3，底部数据占1/3 */
+            min-height: 0; /* 关键：允许Grid子项收缩 */
         }
         .chart-area { width: 100%; height: 100%; position: relative; }
-        .data-area { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; overflow: hidden; } /* 底部两表格并排 */
+        .data-area { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; overflow: hidden; min-height: 0; }
         
         /* 表格样式 */
         .data-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-        .data-table th, .data-table td { text-align: right; padding: 4px 6px; border-bottom: 1px solid var(--border-color); }
-        .data-table th { position: sticky; top: 0; background: var(--panel-bg); color: var(--text-sub); }
+        .data-table th, .data-table td { text-align: right; padding: 4px 6px; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+        .data-table th { position: sticky; top: 0; background: var(--panel-bg); color: var(--text-sub); z-index: 1; }
+        /* 强制股票名称左对齐 */
+        .data-table td.name-col { text-align: left; }
 
         /* --- 4. 右侧：紧凑操作栏 --- */
-        .col-right { grid-row: 2 / 3; grid-column: 3 / 4; padding: 0; gap: 4px; border:none; background: transparent; box-shadow: none;}
+        .col-right { grid-row: 2 / 3; grid-column: 3 / 4; padding: 0; gap: 4px; border:none; background: transparent; box-shadow: none; display: flex; flex-direction: column; overflow: hidden;}
         
         .control-panel {
             background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 4px;
-            padding: 10px; display: flex; flex-direction: column; gap: 10px;
+            padding: 8px; display: flex; flex-direction: column; gap: 8px;
         }
         
         .compact-row { display: flex; flex-direction: column; gap: 2px; }
         .compact-label { font-size: 10px; color: var(--text-sub); }
         
         /* 紧凑输入框组 */
-        .input-group { display: flex; gap: 4px; }
+        .input-group { display: flex; gap: 4px; align-items: center;}
         .input-mini { 
             flex: 1; background: var(--bg-color); border: 1px solid var(--border-color); 
-            color: var(--text-main); padding: 4px; border-radius: 2px; font-size: 12px; outline: none; 
+            color: var(--text-main); padding: 4px; border-radius: 2px; font-size: 12px; outline: none; width: 0; /* 让flex生效 */
         }
         .input-mini:focus { border-color: var(--accent); }
         
-        /* 小按钮 */
+        /* 极小按钮 */
         .btn-mini {
-            padding: 0 8px; font-size: 11px; border: none; border-radius: 2px; cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
+            padding: 0 8px; height: 24px; font-size: 11px; border: none; border-radius: 2px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; white-space: nowrap;
         }
         .btn-blue { background: var(--accent); color: white; }
-        .btn-red { background: #d32f2f; color: white; }
+        .btn-red { background: #d32f2f; color: white; opacity: 0.8; }
+        .btn-red:hover { opacity: 1; }
 
         /* 搜索列表 */
-        .search-res { max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); background: var(--bg-color); font-size: 11px; margin-top:2px;}
-        .search-row { padding: 4px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
+        .search-res { flex:1; overflow-y: auto; border: 1px solid var(--border-color); background: var(--bg-color); font-size: 11px; margin-top:2px; min-height: 0; }
+        .search-row { padding: 6px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
         .search-row:hover { background: var(--hover-bg); }
 
         /* 工具栏 */
-        .tools-row { display: flex; justify-content: space-between; margin-top: auto; padding-top: 10px; border-top: 1px dashed var(--border-color); }
+        .tools-row { display: flex; justify-content: space-between; margin-top: auto; padding-top: 5px; border-top: 1px dashed var(--border-color); }
         .tool-icon { cursor: pointer; opacity: 0.6; font-size: 14px; }
         .tool-icon:hover { opacity: 1; color: var(--accent); }
 
         .t-up { color: var(--up) !important; } .t-down { color: var(--down) !important; }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        ::-webkit-scrollbar-track { background: transparent; }
     </style>
 </head>
 <body>
@@ -208,21 +213,22 @@
                                 <td>{{ h.nav }}</td>
                                 <td :class="parseFloat(h.rate)>=0?'t-up':'t-down'">{{ h.rate }}%</td>
                             </tr>
-                            <tr v-if="!historyData.length"><td colspan="3" style="text-align:center; color:#666">无数据</td></tr>
+                            <tr v-if="!historyData.length"><td colspan="3" style="text-align:center; color:#666; padding:10px;">无数据</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
             <div class="panel">
-                <div class="panel-header" style="height:24px; font-size:11px;">重仓股票</div>
+                <div class="panel-header" style="height:24px; font-size:11px;">重仓股票 (实时名称)</div>
                 <div style="flex:1; overflow-y:auto;">
                     <table class="data-table">
-                        <thead><tr><th>名称</th><th>占比</th></tr></thead>
+                        <thead><tr><th style="text-align:left">股票名称</th><th>代码</th></tr></thead>
                         <tbody>
                             <tr v-for="s in holdingsData">
-                                <td>{{ s.name }}</td><td>{{ s.percent }}</td>
+                                <td class="name-col" style="font-weight:bold; color:var(--text-main)">{{ s.name }}</td>
+                                <td style="color:var(--text-sub)">{{ s.code }}</td>
                             </tr>
-                            <tr v-if="!holdingsData.length"><td colspan="2" style="text-align:center; color:#666">无数据</td></tr>
+                            <tr v-if="!holdingsData.length"><td colspan="2" style="text-align:center; color:#666; padding:10px;">无数据</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -231,53 +237,55 @@
     </main>
 
     <aside class="col-right">
-        <div class="control-panel" v-if="selectedFundCode">
+        <div class="control-panel" v-if="selectedFundCode" style="flex-shrink:0">
             <div class="compact-row">
                 <span class="compact-label">当前选中</span>
-                <div style="font-weight:bold; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                <div style="font-weight:bold; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--accent)">
                     {{ getSelectedFundName() }}
                 </div>
             </div>
             
             <div class="compact-row">
-                <span class="compact-label">持有份额 / 加仓</span>
+                <span class="compact-label">持有份额 / 加减仓</span>
                 <div class="input-group">
-                    <input type="number" v-model.number="currentFundEdit.shares" class="input-mini" placeholder="份数">
-                    <button class="btn-mini btn-blue" @click="saveCurrentFund" title="更新/保存">ok</button>
+                    <input type="number" step="100" v-model.number="currentFundEdit.shares" class="input-mini" placeholder="份">
+                    <button class="btn-mini btn-blue" @click="saveCurrentFund" title="保存">OK</button>
                 </div>
                 <div style="font-size:10px; color:var(--text-sub); text-align:right">
                     市值: {{ (currentFundEdit.shares * parseFloat(getSelectedFundVal()||0)).toFixed(0) }}
                 </div>
             </div>
 
-            <div style="text-align:right; margin-top:5px;">
+            <div style="text-align:right; margin-top:2px;">
                 <button class="btn-mini btn-red" style="width:100%" @click="removeCurrentFund">删除此基金</button>
             </div>
         </div>
-        <div v-else class="control-panel" style="text-align:center; color:var(--text-sub); font-size:11px;">
-            <br>请在左侧<br>选择基金<br><br>
+        <div v-else class="control-panel" style="text-align:center; color:var(--text-sub); font-size:11px; flex-shrink:0; padding:20px 0;">
+            请在左侧<br>选择基金
         </div>
 
-        <div class="control-panel">
-            <div class="compact-row">
-                <span class="compact-label">添加基金 (搜索)</span>
-                <input v-model="searchInput" @input="handleSearch" class="input-mini" placeholder="代码/名称">
+        <div class="control-panel" style="flex:1; display:flex; flex-direction:column; min-height:0;">
+            <div class="compact-row" style="flex-shrink:0;">
+                <span class="compact-label">添加基金 (搜代码/名)</span>
+                <input v-model="searchInput" @input="handleSearch" class="input-mini" style="width:100%" placeholder="如 000001">
             </div>
-            <div v-if="searchResults.length" class="search-res">
+            
+            <div class="search-res" v-if="searchResults.length">
                 <div v-for="res in searchResults" @click="addFund(res)" class="search-row">
-                    <div>{{ res.NAME }}</div>
-                    <div style="color:var(--text-sub)">{{ res.CODE }}</div>
+                    <div style="font-weight:bold">{{ res.NAME }}</div>
+                    <div style="color:var(--text-sub); font-size:10px;">{{ res.CODE }}</div>
                 </div>
             </div>
+            <div v-else style="flex:1;"></div>
 
-            <div class="tools-row">
+            <div class="tools-row" style="flex-shrink:0;">
                 <div class="tool-icon" @click="settings.privacyMode = !settings.privacyMode" title="隐私模式">
                     {{ settings.privacyMode ? '👁️' : '👓' }}
                 </div>
                 <div class="tool-icon" @click="toggleTheme" title="切换主题">
                     {{ isLightMode ? '🌞' : '🌚' }}
                 </div>
-                <input type="range" min="10" max="14" v-model="settings.fontSize" @input="updateFont" style="width:60px;" title="字号">
+                <input type="range" min="10" max="14" v-model="settings.fontSize" @input="updateFont" style="width:50px;" title="字号">
             </div>
         </div>
     </aside>
@@ -318,9 +326,9 @@
                 if (target) {
                     target.name = data.name; target.gsz = data.gsz; target.gszzl = data.gszzl; target.lastTime = data.gztime;
                     if(!chartHistory.value[target.code]) chartHistory.value[target.code] = [];
-                    // 简单模拟分时数据累积
                     const arr = chartHistory.value[target.code];
                     const time = data.gztime.split(' ')[1] || data.gztime;
+                    // 模拟分时图数据点
                     if(arr.length===0 || arr[arr.length-1].time !== time) {
                         arr.push({ time: time, value: data.gsz });
                         if(arr.length > 200) arr.shift();
@@ -329,16 +337,73 @@
                 }
             };
 
+            // 获取详情：包括重仓股真实名称
             const fetchDetailData = (code) => {
                 historyData.value = []; holdingsData.value = [];
                 const ts = new Date().getTime();
                 const script = document.createElement('script');
                 script.src = `https://fund.eastmoney.com/pingzhongdata/${code}.js?v=${ts}`;
+                
                 script.onload = () => {
-                    if (window.Data_netWorthTrend) historyData.value = window.Data_netWorthTrend.slice(-10).reverse().map(i => ({date: new Date(i.x).toISOString().split('T')[0], nav: i.y, rate: i.equityReturn}));
-                    if (window.stockCodes) holdingsData.value = window.stockCodes.slice(0, 5).map(c => ({name: (c.startsWith('6')?'沪':'深')+c, percent: (Math.random()*5+1).toFixed(2)+'%' }));
+                    // 1. 获取净值历史
+                    if (window.Data_netWorthTrend) {
+                        historyData.value = window.Data_netWorthTrend.slice(-10).reverse().map(i => ({
+                            date: new Date(i.x).toISOString().split('T')[0], 
+                            nav: i.y, 
+                            rate: i.equityReturn
+                        }));
+                    }
+                    // 2. 获取重仓股代码，然后去新浪查名字
+                    if (window.stockCodes && window.stockCodes.length > 0) {
+                        const codes = window.stockCodes.slice(0, 10);
+                        fetchStockNames(codes);
+                    }
                     script.remove();
                 };
+                document.body.appendChild(script);
+            };
+
+            // --- 新增：从新浪财经获取真实股票名称 ---
+            const fetchStockNames = (codes) => {
+                // 构造新浪接口参数，需要判断 sh/sz/bj
+                // 简易逻辑：6开头sh, 0/3开头sz, 4/8开头bj
+                const sinaCodes = codes.map(c => {
+                    if(c.startsWith('6')) return `sh${c}`;
+                    if(c.startsWith('0') || c.startsWith('3')) return `sz${c}`;
+                    if(c.startsWith('4') || c.startsWith('8')) return `bj${c}`;
+                    if(c.length === 5) return `hk${c}`; // 港股
+                    return `sh${c}`; // 默认
+                }).join(',');
+
+                const script = document.createElement('script');
+                // 关键：新浪接口返回GBK，必须指定charset防止乱码
+                script.charset = "gbk"; 
+                script.src = `https://hq.sinajs.cn/list=${sinaCodes}`;
+                
+                script.onload = () => {
+                    const result = [];
+                    codes.forEach((c, index) => {
+                        const sinaCode = sinaCodes.split(',')[index];
+                        const varName = `hq_str_${sinaCode}`;
+                        let name = c; // 默认显示代码
+                        
+                        if(window[varName]) {
+                            // 新浪返回格式: var hq_str_sh600519="贵州茅台,..."
+                            const parts = window[varName].split(',');
+                            if(parts.length > 0 && parts[0].trim() !== '') {
+                                name = parts[0];
+                            }
+                        }
+                        result.push({ code: c, name: name });
+                    });
+                    holdingsData.value = result;
+                    script.remove();
+                };
+                script.onerror = () => {
+                    // 失败降级：只显示代码
+                    holdingsData.value = codes.map(c => ({code: c, name: '未知股票'}));
+                    script.remove();
+                }
                 document.body.appendChild(script);
             };
 
@@ -418,14 +483,14 @@
 
             const toggleTheme = () => { isLightMode.value = !isLightMode.value; document.documentElement.className = isLightMode.value ? 'light' : 'dark'; };
             const updateFont = () => document.documentElement.style.setProperty('--font-size-base', settings.value.fontSize + 'px');
-            const saveData = () => localStorage.setItem('myFunds_Compact', JSON.stringify(funds.value));
+            const saveData = () => localStorage.setItem('myFunds_Final_RealStock', JSON.stringify(funds.value));
             const manualRefresh = () => funds.value.forEach(f => fetchFundData(f.code));
 
             onMounted(() => {
                 document.getElementById('app').style.display = 'grid';
-                const d = localStorage.getItem('myFunds_Compact');
+                const d = localStorage.getItem('myFunds_Final_RealStock');
                 if(d) funds.value = JSON.parse(d);
-                else funds.value = [{code:'000001', name:'示例基金', shares:1000, gszzl:'0.00', gsz:'1.000'}];
+                else funds.value = [{code:'009052', name:'示例基金', shares:1000, gszzl:'0.00', gsz:'1.000'}];
                 manualRefresh();
                 setInterval(() => { refreshCountdown.value--; if(refreshCountdown.value<=0) { manualRefresh(); refreshCountdown.value=10; } }, 1000);
                 window.addEventListener('resize', () => chartInstance && chartInstance.resize());
