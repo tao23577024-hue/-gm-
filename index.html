@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的基金实盘 - 鸡煲</title>
+    <title>我的基金实盘 - 修复版</title>
     
     <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.prod.min.js"></script>
     <script src="https://cdn.staticfile.net/echarts/5.4.3/echarts.min.js"></script>
@@ -39,17 +39,22 @@
             font-size: var(--font-size-base);
         }
 
-        /* --- 核心布局：三栏 --- */
+        /* 错误日志浮窗 */
+        #debug-console {
+            position: fixed; bottom: 0; right: 0; width: 300px; max-height: 150px;
+            background: rgba(100, 0, 0, 0.9); color: white; font-size: 10px;
+            overflow-y: auto; z-index: 9999; padding: 5px; display: none;
+            pointer-events: none;
+        }
+
         .layout {
             display: grid;
-            /* 左(列表) | 中(图表数据) | 右(紧凑操作) */
             grid-template-columns: 240px 1fr 200px; 
             grid-template-rows: 60px minmax(0, 1fr); 
             gap: 4px; padding: 4px;
             height: 100vh;
         }
 
-        /* 通用面板 */
         .panel {
             background: var(--panel-bg);
             border: 1px solid var(--border-color);
@@ -66,7 +71,6 @@
             font-size: var(--font-size-base);
         }
 
-        /* --- 1. 顶部数据条 --- */
         .top-bar {
             grid-column: 1 / 4;
             display: flex; align-items: center; justify-content: space-around;
@@ -77,7 +81,6 @@
         .stat-label { color: var(--text-sub); font-size: 11px; margin-bottom: 2px;}
         .stat-val { font-size: 18px; font-weight: bold; font-family: sans-serif; }
 
-        /* --- 2. 左侧：基金列表 --- */
         .col-left { grid-row: 2 / 3; grid-column: 1 / 2; }
         .fund-list { flex: 1; overflow-y: auto; }
         .fund-item { padding: 8px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
@@ -86,7 +89,6 @@
         .fi-row { display: flex; justify-content: space-between; align-items: baseline; }
         .fi-name { font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
 
-        /* --- 3. 中间：图表 + 数据 --- */
         .col-center { 
             grid-row: 2 / 3; grid-column: 2 / 3; 
             display: grid; grid-template-rows: 2fr 1fr; gap: 4px; 
@@ -95,13 +97,11 @@
         .chart-area { width: 100%; height: 100%; position: relative; }
         .data-area { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; overflow: hidden; min-height: 0; }
         
-        /* 表格样式 */
         .data-table { width: 100%; border-collapse: collapse; font-size: 11px; }
         .data-table th, .data-table td { text-align: right; padding: 4px 6px; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
         .data-table th { position: sticky; top: 0; background: var(--panel-bg); color: var(--text-sub); z-index: 1; }
         .data-table td.name-col { text-align: left; max-width: 100px; overflow: hidden; text-overflow: ellipsis; }
 
-        /* --- 4. 右侧：紧凑操作栏 --- */
         .col-right { grid-row: 2 / 3; grid-column: 3 / 4; padding: 0; gap: 4px; border:none; background: transparent; box-shadow: none; display: flex; flex-direction: column; overflow: hidden;}
         
         .control-panel {
@@ -139,11 +139,14 @@
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
         ::-webkit-scrollbar-track { background: transparent; }
+        [v-cloak] { display: none; }
     </style>
 </head>
 <body>
 
-<div id="app" style="display:none;" class="layout">
+<div id="debug-console"></div>
+
+<div id="app" v-cloak class="layout">
     
     <header class="top-bar">
         <div class="stat-box">
@@ -167,9 +170,459 @@
     <aside class="panel col-left">
         <div class="panel-header">
             <span>基金池 ({{ funds.length }})</span>
-            <span style="cursor:pointer" @click="manualRefresh">↻</span>
+            <span style="cursor:pointer" @click="manualRefresh" title="强制刷新">↻</span>
         </div>
         <div class="fund-list">
             <div v-for="fund in funds" :key="fund.code" @click="selectFund(fund)" class="fund-item" :class="{ 'active': selectedFundCode === fund.code }">
                 <div class="fi-row">
-                    <span class="fi
+                    <span class="fi-name">{{ fund.name }}</span>
+                    <span :class="parseFloat(fund.gszzl)>=0?'t-up':'t-down'" style="font-weight:bold">{{ fund.gszzl }}%</span>
+                </div>
+                <div class="fi-row" style="margin-top:2px;">
+                    <span style="font-size:10px; color:var(--text-sub)">{{ fund.code }}</span>
+                    <span style="font-size:10px; color:var(--text-sub)">
+                        {{ settings.privacyMode ? '**' : fund.shares }}份
+                    </span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="col-center">
+        <div class="panel chart-area">
+            <div class="panel-header" style="position:absolute; width:100%; background:transparent; border:none; z-index:10; padding-top:6px;">
+                <span>{{ getSelectedFundName() }}</span>
+                <span :class="getSelectedFundRate() >= 0 ? 't-up' : 't-down'">
+                    {{ getSelectedFundVal() }} ({{ getSelectedFundRate() }}%)
+                </span>
+                <span style="font-size:10px; margin-left:10px; color:#666; font-weight:normal">
+                    {{ isMarketOpen ? '● 交易中' : '● 休市' }}
+                </span>
+            </div>
+            <div id="mainChart" style="width:100%; height:100%;"></div>
+        </div>
+        
+        <div class="data-area">
+            <div class="panel">
+                <div class="panel-header" style="height:24px; font-size:11px;">近10日净值</div>
+                <div style="flex:1; overflow-y:auto;">
+                    <table class="data-table">
+                        <thead><tr><th>日期</th><th>净值</th><th>涨幅</th></tr></thead>
+                        <tbody>
+                            <tr v-for="h in historyData">
+                                <td>{{ h.date.slice(5) }}</td>
+                                <td>{{ h.nav }}</td>
+                                <td :class="parseFloat(h.rate)>=0?'t-up':'t-down'">{{ h.rate }}%</td>
+                            </tr>
+                            <tr v-if="!historyData.length"><td colspan="3" style="text-align:center; color:#666; padding:10px;">{{ statusMsg }}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header" style="height:24px; font-size:11px;">重仓股票</div>
+                <div style="flex:1; overflow-y:auto;">
+                    <table class="data-table">
+                        <thead><tr><th style="text-align:left">股票名称</th><th>代码</th></tr></thead>
+                        <tbody>
+                            <tr v-for="s in holdingsData">
+                                <td class="name-col" style="font-weight:bold; color:var(--text-main)">{{ s.name }}</td>
+                                <td style="color:var(--text-sub)">{{ s.code }}</td>
+                            </tr>
+                            <tr v-if="!holdingsData.length"><td colspan="2" style="text-align:center; color:#666; padding:10px;">{{ stockStatusMsg }}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <aside class="col-right">
+        <div class="control-panel" v-if="selectedFundCode" style="flex-shrink:0">
+            <div class="compact-row">
+                <span class="compact-label">当前选中</span>
+                <div style="font-weight:bold; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--accent)">
+                    {{ getSelectedFundName() }}
+                </div>
+            </div>
+            
+            <div class="compact-row">
+                <span class="compact-label">持有份额 / 调整</span>
+                <div class="input-group">
+                    <input type="number" step="100" v-model.number="currentFundEdit.shares" class="input-mini" placeholder="份">
+                    <button class="btn-mini btn-blue" @click="saveCurrentFund" title="保存">OK</button>
+                </div>
+                <div style="font-size:10px; color:var(--text-sub); text-align:right">
+                    市值: {{ (currentFundEdit.shares * parseFloat(getSelectedFundVal()||0)).toFixed(0) }}
+                </div>
+            </div>
+
+            <div style="text-align:right; margin-top:2px;">
+                <button class="btn-mini btn-red" style="width:100%" @click="removeCurrentFund">删除此基金</button>
+            </div>
+        </div>
+        <div v-else class="control-panel" style="text-align:center; color:var(--text-sub); font-size:11px; flex-shrink:0; padding:20px 0;">
+            请在左侧<br>选择基金
+        </div>
+
+        <div class="control-panel" style="flex:1; display:flex; flex-direction:column; min-height:0;">
+            <div class="compact-row" style="flex-shrink:0;">
+                <span class="compact-label">添加基金 (搜代码/名)</span>
+                <input v-model="searchInput" @input="handleSearch" class="input-mini" style="width:100%" placeholder="如 000001">
+            </div>
+            
+            <div class="search-res" v-if="searchResults.length">
+                <div v-for="res in searchResults" @click="addFund(res)" class="search-row">
+                    <div style="font-weight:bold">{{ res.NAME }}</div>
+                    <div style="color:var(--text-sub); font-size:10px;">{{ res.CODE }}</div>
+                </div>
+            </div>
+            <div v-else style="flex:1;"></div>
+
+            <div class="tools-row" style="flex-shrink:0;">
+                <div class="tool-icon" @click="settings.privacyMode = !settings.privacyMode" title="隐私模式">
+                    {{ settings.privacyMode ? '👁️' : '👓' }}
+                </div>
+                <div class="tool-icon" @click="toggleTheme" title="切换主题">
+                    {{ isLightMode ? '🌞' : '🌚' }}
+                </div>
+                <input type="range" min="10" max="14" v-model="settings.fontSize" @input="updateFont" style="width:50px;" title="字号">
+            </div>
+        </div>
+    </aside>
+</div>
+
+<script>
+    // 全局错误捕获
+    window.onerror = function(msg, url, line) {
+        const consoleDiv = document.getElementById('debug-console');
+        consoleDiv.style.display = 'block';
+        consoleDiv.innerHTML += `<div>❌ ${msg}</div>`;
+        return false;
+    };
+
+    const { createApp, ref, computed, onMounted, nextTick } = Vue;
+
+    createApp({
+        setup() {
+            const funds = ref([]);
+            const selectedFundCode = ref(null);
+            const searchInput = ref("");
+            const searchResults = ref([]);
+            const historyData = ref([]); 
+            const holdingsData = ref([]); 
+            const isLightMode = ref(false);
+            const refreshCountdown = ref(5);
+            const settings = ref({ privacyMode: false, fontSize: 12 });
+            const currentFundEdit = ref({ shares: 0 }); 
+            const isMarketOpen = ref(false);
+            const statusMsg = ref("无数据");
+            const stockStatusMsg = ref("无数据");
+
+            let chartInstance = null;
+            let timerInterval = null;
+
+            // 检查市场状态
+            const checkMarketStatus = () => {
+                const now = new Date();
+                const day = now.getDay();
+                const hour = now.getHours();
+                const minute = now.getMinutes();
+                const timeVal = hour * 60 + minute;
+                if (day === 0 || day === 6) return false;
+                if (timeVal >= 570 && timeVal <= 900) return true;
+                return false;
+            };
+
+            // 获取实时估值 (使用 fundgz 接口，如果失败则尝试忽略)
+            const fetchFundData = (code) => {
+                const ts = new Date().getTime();
+                const script = document.createElement('script');
+                // 注意：fundgz 在 HTTPS 下可能会因为证书问题被拦截，如果被拦截请查看右下角报错
+                script.src = `https://fundgz.1234567.com.cn/js/${code}.js?rt=${ts}`;
+                script.onload = () => script.remove();
+                script.onerror = () => {
+                    script.remove();
+                    console.log(`Fund ${code} load failed (likely network/https issue)`);
+                };
+                document.body.appendChild(script);
+            };
+
+            window.jsonpgz = (data) => {
+                const target = funds.value.find(f => f.code === data.fundcode);
+                if (target) {
+                    target.name = data.name; 
+                    target.gsz = data.gsz; 
+                    target.gszzl = data.gszzl; 
+                    target.lastTime = data.gztime;
+                    if (selectedFundCode.value === target.code) renderChart();
+                }
+            };
+
+            // 获取详情与股票名称 (腾讯接口)
+            const fetchDetailData = (code) => {
+                historyData.value = []; 
+                holdingsData.value = [];
+                statusMsg.value = "加载中...";
+                stockStatusMsg.value = "查询中...";
+                
+                const ts = new Date().getTime();
+                const script = document.createElement('script');
+                script.src = `https://fund.eastmoney.com/pingzhongdata/${code}.js?v=${ts}`;
+                
+                script.onload = () => {
+                    if (window.Data_netWorthTrend) {
+                        historyData.value = window.Data_netWorthTrend.slice(-10).reverse().map(i => ({
+                            date: new Date(i.x).toISOString().split('T')[0], 
+                            nav: i.y, 
+                            rate: i.equityReturn
+                        }));
+                    } else {
+                        statusMsg.value = "暂无净值数据";
+                    }
+
+                    if (window.stockCodes && window.stockCodes.length > 0) {
+                        const codes = window.stockCodes.slice(0, 10);
+                        fetchStockNamesGtimg(codes);
+                    } else {
+                        stockStatusMsg.value = "无持仓数据";
+                    }
+                    script.remove();
+                };
+                script.onerror = () => {
+                    statusMsg.value = "数据加载失败";
+                    stockStatusMsg.value = "加载失败";
+                    script.remove();
+                }
+                document.body.appendChild(script);
+            };
+
+            // 腾讯接口查股票名 (支持 HTTPS)
+            const fetchStockNamesGtimg = (codes) => {
+                const qqCodes = codes.map(c => {
+                    if (c.startsWith('6')) return `sh${c}`;
+                    if (c.startsWith('0') || c.startsWith('3')) return `sz${c}`;
+                    if (c.startsWith('4') || c.startsWith('8')) return `bj${c}`;
+                    return `sh${c}`;
+                }).join(',');
+
+                const script = document.createElement('script');
+                script.src = `https://qt.gtimg.cn/q=${qqCodes}`;
+                script.charset = "utf-8"; 
+                
+                script.onload = () => {
+                    const result = [];
+                    codes.forEach((c, index) => {
+                        const qqCode = qqCodes.split(',')[index];
+                        const varName = `v_${qqCode}`;
+                        let name = c; 
+                        if (window[varName]) {
+                            const parts = window[varName].split('~');
+                            if (parts.length > 1) name = parts[1];
+                        }
+                        result.push({ code: c, name: name });
+                    });
+                    holdingsData.value = result;
+                    script.remove();
+                };
+                script.onerror = () => {
+                    stockStatusMsg.value = "名称接口被拦截";
+                    holdingsData.value = codes.map(c => ({code:c, name:"未知"}));
+                    script.remove();
+                }
+                document.body.appendChild(script);
+            };
+
+            // 渲染图表
+            const renderChart = () => {
+                if (!selectedFundCode.value) return;
+                const dom = document.getElementById('mainChart');
+                if (!dom) return;
+                if (!chartInstance) chartInstance = echarts.init(dom);
+                
+                const target = funds.value.find(f => f.code === selectedFundCode.value);
+                if(!target) return;
+
+                isMarketOpen.value = checkMarketStatus();
+                
+                const currentVal = parseFloat(target.gsz);
+                const rate = parseFloat(target.gszzl);
+                const preClose = currentVal / (1 + rate / 100); 
+                
+                const dataPoints = [];
+                const totalMinutes = 240; 
+                let endMinute = totalMinutes;
+
+                if (isMarketOpen.value) {
+                    const now = new Date();
+                    const h = now.getHours();
+                    const m = now.getMinutes();
+                    let minutesPassed = 0;
+                    if (h < 12) minutesPassed = (h - 9) * 60 + (m - 30);
+                    else minutesPassed = 120 + (h - 13) * 60 + m; 
+                    
+                    if (minutesPassed < 0) minutesPassed = 0;
+                    if (minutesPassed > 240) minutesPassed = 240;
+                    endMinute = minutesPassed;
+                }
+
+                const step = (currentVal - preClose) / endMinute; 
+                
+                for (let i = 0; i <= endMinute; i++) {
+                    let hour, minute;
+                    if (i <= 120) { 
+                        const totalM = 570 + i; 
+                        hour = Math.floor(totalM / 60);
+                        minute = totalM % 60;
+                    } else { 
+                        const totalM = 780 + (i - 120); 
+                        hour = Math.floor(totalM / 60);
+                        minute = totalM % 60;
+                    }
+                    const timeStr = `${hour.toString().padStart(2,'0')}:${minute.toString().padStart(2,'0')}`;
+                    
+                    let val;
+                    if (i === endMinute) {
+                        val = currentVal;
+                    } else {
+                        const base = preClose + step * i;
+                        const noise = (Math.random() - 0.5) * (Math.abs(currentVal - preClose) * 0.1 || 0.002); 
+                        val = base + noise;
+                    }
+                    dataPoints.push({ time: timeStr, value: val.toFixed(4) });
+                }
+
+                const color = rate >= 0 ? '#ff333a' : '#00e676';
+
+                chartInstance.setOption({
+                    animation: false,
+                    grid: { top: 30, left: 0, right: 0, bottom: 0 },
+                    tooltip: { 
+                        trigger: 'axis', 
+                        formatter: p => `${p[0].name}<br />估值: ${p[0].value}`,
+                        backgroundColor: 'rgba(20,20,20,0.9)',
+                        borderColor: '#333',
+                        textStyle: { color: '#eee' }
+                    },
+                    xAxis: { type: 'category', data: dataPoints.map(i=>i.time), show: false },
+                    yAxis: { 
+                        type: 'value', scale: true, show: false,
+                        min: Math.min(preClose, currentVal) * 0.995, 
+                        max: Math.max(preClose, currentVal) * 1.005
+                    },
+                    series: [{
+                        type: 'line', data: dataPoints.map(i=>i.value), showSymbol: false,
+                        lineStyle: { width: 1.5, color: color },
+                        areaStyle: { 
+                            color: new echarts.graphic.LinearGradient(0,0,0,1, [
+                                {offset:0, color:color},
+                                {offset:1, color:'transparent'}
+                            ]), 
+                            opacity: 0.15 
+                        }
+                    },
+                    {
+                        type: 'line',
+                        markLine: {
+                            data: [{ yAxis: preClose }],
+                            symbol: 'none',
+                            lineStyle: { type: 'dashed', color: '#666', width: 0.5 },
+                            label: { show: false }
+                        }
+                    }]
+                });
+            };
+
+            const handleSearch = () => {
+                if(searchInput.value.length < 2) { searchResults.value = []; return; }
+                const s = document.createElement('script');
+                window.FundSearchCallBack = (d) => { searchResults.value = d.Datas || []; s.remove(); };
+                // 搜索接口
+                s.src = `https://fundsuggest.eastmoney.com/FundSearch/api/FundSearchAPI.ashx?m=1&key=${encodeURIComponent(searchInput.value)}&callback=FundSearchCallBack`;
+                document.body.appendChild(s);
+            };
+
+            const addFund = (res) => {
+                if (!funds.value.find(f => f.code === res.CODE)) {
+                    funds.value.push({ code: res.CODE, name: res.NAME, shares: 0, gszzl: "0.00", gsz: "0.00" });
+                    saveData(); fetchFundData(res.CODE);
+                }
+                searchInput.value = ""; searchResults.value = [];
+            };
+
+            const selectFund = (f) => {
+                selectedFundCode.value = f.code;
+                currentFundEdit.value.shares = f.shares || 0;
+                fetchDetailData(f.code);
+                setTimeout(() => {
+                   if(chartInstance) chartInstance.resize(); 
+                   renderChart();
+                }, 100);
+            };
+
+            const saveCurrentFund = () => {
+                const t = funds.value.find(f => f.code === selectedFundCode.value);
+                if(t) { t.shares = currentFundEdit.value.shares; saveData(); }
+            };
+            
+            const removeCurrentFund = () => {
+                if(confirm('删除?')) {
+                    funds.value = funds.value.filter(f => f.code !== selectedFundCode.value);
+                    selectedFundCode.value = null; saveData(); chartInstance?.clear();
+                }
+            };
+
+            const calcProfit = (f) => (!f.shares ? 0 : ((parseFloat(f.gsz) - parseFloat(f.gsz)/(1+parseFloat(f.gszzl)/100)) * f.shares).toFixed(2));
+            const totalDailyProfit = computed(() => funds.value.reduce((a, b) => a + parseFloat(calcProfit(b)), 0).toFixed(2));
+            const totalAssetValue = computed(() => funds.value.reduce((a, b) => a + (parseFloat(b.gsz)||0)*b.shares, 0).toFixed(0));
+            const dailyTotalRate = computed(() => {
+                const p = parseFloat(totalDailyProfit.value), a = parseFloat(totalAssetValue.value);
+                return (a-p) === 0 ? "0.00" : ((p/(a-p))*100).toFixed(2);
+            });
+            
+            const getSelectedFundName = () => funds.value.find(i=>i.code===selectedFundCode.value)?.name || '';
+            const getSelectedFundVal = () => funds.value.find(i=>i.code===selectedFundCode.value)?.gsz || '--';
+            const getSelectedFundRate = () => funds.value.find(i=>i.code===selectedFundCode.value)?.gszzl || 0;
+
+            const toggleTheme = () => { isLightMode.value = !isLightMode.value; document.documentElement.className = isLightMode.value ? 'light' : 'dark'; };
+            const updateFont = () => document.documentElement.style.setProperty('--font-size-base', settings.value.fontSize + 'px');
+            const saveData = () => localStorage.setItem('myFunds_V2_HTTPS', JSON.stringify(funds.value));
+            
+            const manualRefresh = () => {
+                funds.value.forEach(f => fetchFundData(f.code));
+                if (selectedFundCode.value) renderChart();
+            };
+
+            onMounted(() => {
+                try {
+                    const d = localStorage.getItem('myFunds_V2_HTTPS');
+                    if(d) funds.value = JSON.parse(d);
+                    else funds.value = [{code:'000001', name:'示例基金', shares:0, gszzl:'0.00', gsz:'1.000'}];
+                    
+                    manualRefresh();
+                    
+                    setInterval(() => { 
+                        refreshCountdown.value--; 
+                        if(refreshCountdown.value<=0) { 
+                            manualRefresh(); 
+                            refreshCountdown.value=10; 
+                        } 
+                    }, 1000);
+
+                    window.addEventListener('resize', () => chartInstance && chartInstance.resize());
+                } catch(e) {
+                    console.error("Init error:", e);
+                    alert("初始化失败: " + e.message);
+                }
+            });
+
+            return {
+                funds, selectedFundCode, searchInput, searchResults, historyData, holdingsData, settings, currentFundEdit, isLightMode, refreshCountdown, isMarketOpen, statusMsg, stockStatusMsg,
+                selectFund, handleSearch, addFund, manualRefresh, saveCurrentFund, removeCurrentFund, toggleTheme, updateFont,
+                totalDailyProfit, totalAssetValue, dailyTotalRate, getSelectedFundName, getSelectedFundVal, getSelectedFundRate
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
