@@ -4,10 +4,24 @@
     <meta charset="UTF-8">
     <meta name="referrer" content="no-referrer">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的基金实盘 - 最终完美版</title>
+    <title>我的基金</title>
+
+    <script>
+        window.onerror = function(msg, source, lineno, colno, error) {
+            var consoleDiv = document.getElementById('debug-console');
+            if(!consoleDiv) {
+                consoleDiv = document.createElement('div');
+                consoleDiv.id = 'debug-console';
+                consoleDiv.style.cssText = 'position:fixed;bottom:0;right:0;width:100%;height:150px;background:rgba(100,0,0,0.9);color:white;z-index:99999;overflow:auto;padding:10px;font-size:12px;pointer-events:none;';
+                document.body.appendChild(consoleDiv);
+            }
+            consoleDiv.innerHTML += '<div>❌ ' + msg + ' (Line: ' + lineno + ')</div>';
+            return false;
+        };
+    </script>
     
-    <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.prod.min.js"></script>
-    <script src="https://cdn.staticfile.net/echarts/5.4.3/echarts.min.js"></script>
+    <script src="https://unpkg.com/vue@3.3.4/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/echarts@5.4.3/dist/echarts.min.js"></script>
     
     <style>
         :root {
@@ -35,9 +49,8 @@
             font-size: var(--font-size-base);
         }
 
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 2px; }
+        /* 移除 v-cloak 隐藏，防止黑屏 */
+        /* [v-cloak] { display: none; } */
 
         .layout {
             display: grid;
@@ -169,17 +182,21 @@
 
         .label { font-size: 11px; color: var(--text-sub); margin-bottom: 4px; display: block; }
         .t-up { color: var(--up) !important; } .t-down { color: var(--down) !important; }
-        [v-cloak] { display: none; }
-        
-        /* 错误日志 */
-        #debug-console { position: fixed; bottom: 0; right: 0; z-index: 9999; background: rgba(0,0,0,0.8); color: #ff6b6b; font-size: 10px; padding: 5px; display:none; max-height:100px; overflow-y:auto;}
+
+        /* 加载中覆盖层 */
+        #init-loader {
+            position: fixed; top:0; left:0; width:100%; height:100%; 
+            background: var(--bg-body); z-index: 9999;
+            display: flex; justify-content: center; align-items: center;
+            color: var(--text-sub); font-size: 14px;
+        }
     </style>
 </head>
 <body>
 
-<div id="debug-console"></div>
+<div id="init-loader">正在初始化系统资源...</div>
 
-<div id="app" v-cloak class="layout">
+<div id="app" class="layout">
     
     <header class="top-bar">
         <div class="stat-card">
@@ -284,7 +301,6 @@
     </main>
 
     <aside class="col-right">
-        
         <div class="control-group" v-if="selectedFundCode">
             <div>
                 <span class="label">持有金额 (CNY)</span>
@@ -296,7 +312,6 @@
                     自动折合份额
                 </div>
             </div>
-            
             <button class="btn btn-danger" @click="removeCurrentFund" style="width:100%">删除此基金</button>
         </div>
         <div v-else class="control-group" style="text-align:center; padding: 40px 0; color: var(--text-sub);">
@@ -309,7 +324,6 @@
                 <span style="margin-right:8px; opacity:0.5">🔍</span>
                 <input v-model="searchInput" @input="handleSearch" class="search-input" placeholder="输入代码或名称">
             </div>
-
             <div style="flex:1; overflow-y:auto; margin-top:10px;">
                 <div v-for="res in searchResults" @click="addFund(res)" 
                      style="padding:10px; border-bottom:1px solid var(--border-soft); cursor:pointer; font-size:12px;">
@@ -320,13 +334,12 @@
         </div>
 
         <div class="control-group">
-            <span class="label">数据源 (修复加载问题)</span>
+            <span class="label">股票数据源 (解决不显示问题)</span>
             <select v-model="settings.stockSource" class="select-styled" @change="manualRefresh">
                 <option value="tencent">腾讯接口 (极速)</option>
                 <option value="eastmoney">东财接口 (精确)</option>
                 <option value="sina">新浪接口 (备用)</option>
             </select>
-
             <div style="display:flex; justify-content: space-between; align-items: center; margin-top:4px;">
                 <span class="label" style="margin:0">隐私模式</span>
                 <div @click="settings.privacyMode = !settings.privacyMode" style="cursor:pointer; font-size:18px;">
@@ -334,19 +347,10 @@
                 </div>
             </div>
         </div>
-
     </aside>
-
 </div>
 
 <script>
-    // 错误日志捕获
-    window.onerror = function(msg) {
-        const c = document.getElementById('debug-console');
-        c.style.display='block';
-        c.innerHTML+=`<div>${msg}</div>`;
-    };
-
     const { createApp, ref, computed, onMounted } = Vue;
 
     createApp({
@@ -361,13 +365,18 @@
             const currentFundEdit = ref({ amount: 0 });
             const isMarketOpen = ref(false);
             const stockStatusMsg = ref("点击基金查看详情");
-            const isLoadingStock = ref(false); // 新增：加载状态，不清除数据
+            const isLoadingStock = ref(false); 
 
             let chartInstance = null;
             const fundStockCache = {}; 
 
-            // --- 核心逻辑 ---
+            // 移除启动加载层
+            onMounted(() => {
+                const loader = document.getElementById('init-loader');
+                if(loader) loader.style.display = 'none';
+            });
 
+            // 检查市场状态
             const checkMarketStatus = () => {
                 const now = new Date();
                 const day = now.getDay();
@@ -398,19 +407,13 @@
 
             // 获取详情：仅为了获取持仓股票代码
             const fetchDetailData = (code) => {
-                // 注意：这里不要直接 holdingsData.value = []，防止闪烁
-                // 只有第一次加载时才清空，或者切换基金时清空
-                // 如果是刷新，保持旧数据，直到新数据回来
-                
                 isLoadingStock.value = true;
                 
-                // 优先从缓存取代码
                 if (fundStockCache[code]) {
                     fetchStockDetails(fundStockCache[code]);
                     return;
                 }
                 
-                // 如果没有缓存，说明是新基金，先显示加载
                 if (holdingsData.value.length === 0) stockStatusMsg.value = "加载中...";
 
                 const ts = new Date().getTime();
@@ -420,7 +423,7 @@
                 s.onload = () => {
                     if (window.stockCodes && window.stockCodes.length > 0) {
                         const codes = window.stockCodes.slice(0, 10);
-                        fundStockCache[code] = codes; // 缓存
+                        fundStockCache[code] = codes; 
                         fetchStockDetails(codes);
                     } else {
                         stockStatusMsg.value = "无公开持仓数据";
@@ -445,7 +448,7 @@
                 else fetchStocksSina(codes);
             };
 
-            // 1. 腾讯接口 (修复版：自动识别市场前缀)
+            // 1. 腾讯接口
             const fetchStocksTencent = (codes) => {
                 const qqCodes = codes.map(c => {
                     if (c.startsWith('6')) return `sh${c}`;
@@ -469,12 +472,12 @@
                             const parts = window[vName].split('~');
                             if (parts.length > 32) {
                                 name = parts[1];
-                                percent = parts[32]; // 涨跌幅
+                                percent = parts[32]; 
                             }
                         }
                         res.push({ code: c, name: name, percent: percent });
                     });
-                    holdingsData.value = res; // 替换数据
+                    holdingsData.value = res;
                     isLoadingStock.value = false;
                     s.remove();
                 };
@@ -490,7 +493,7 @@
             const fetchStocksEastmoney = (codes) => {
                 const secIds = codes.map(c => {
                     if (c.startsWith('6')) return `1.${c}`;
-                    if (c.length === 5) return `116.${c}`; // 港股简单处理
+                    if (c.length === 5) return `116.${c}`; 
                     return `0.${c}`;
                 }).join(',');
 
@@ -499,20 +502,13 @@
                 window[cbName] = (data) => {
                     if(data && data.data && data.data.diff) {
                         const res = [];
-                        // 建立 map 保证顺序
                         const map = {};
-                        data.data.diff.forEach(item => {
-                            map[item.f12] = item;
-                        });
+                        data.data.diff.forEach(item => { map[item.f12] = item; });
                         
                         codes.forEach(c => {
                             const item = map[c];
                             if(item) {
-                                res.push({
-                                    code: c,
-                                    name: item.f14,
-                                    percent: item.f3 == '-' ? '0.00' : item.f3 
-                                });
+                                res.push({ code: c, name: item.f14, percent: item.f3 == '-' ? '0.00' : item.f3 });
                             } else {
                                 res.push({ code: c, name: c, percent: '--' });
                             }
@@ -564,7 +560,6 @@
                 document.body.appendChild(s);
             };
 
-            // --- 确定性 K线 ---
             const deterministicNoise = (seed) => {
                 const x = Math.sin(seed * 9999) * 10000;
                 return (x - Math.floor(x)) - 0.5;
@@ -610,7 +605,7 @@
                     dataPoints.push({ time: timeStr, value: val.toFixed(4) });
                 }
 
-                const color = rate >= 0 ? '#fa5252' : '#00e676'; // 红涨绿跌
+                const color = rate >= 0 ? '#fa5252' : '#00e676';
                 const bgGradient = new echarts.graphic.LinearGradient(0,0,0,1, [{offset:0, color:color},{offset:1, color:'rgba(0,0,0,0)'}]);
 
                 chartInstance.setOption({
@@ -650,12 +645,10 @@
             };
 
             const selectFund = (f) => {
-                // 如果切换了不同的基金，才清空重仓股数据，避免闪烁
                 if (selectedFundCode.value !== f.code) {
                     holdingsData.value = [];
                     stockStatusMsg.value = "加载中...";
                 }
-                
                 selectedFundCode.value = f.code;
                 currentFundEdit.value.amount = (f.shares * (parseFloat(f.gsz)||1)).toFixed(2);
                 fetchDetailData(f.code);
@@ -677,6 +670,10 @@
                 }
             };
 
+            const retryHoldings = () => {
+                if(selectedFundCode.value) fetchDetailData(selectedFundCode.value);
+            };
+
             const getFundAmount = (f) => `¥${(f.shares * parseFloat(f.gsz || 0)).toFixed(2)}`;
             const calcProfitRaw = (f) => (!f.shares ? "0.00" : ((parseFloat(f.gsz) - parseFloat(f.gsz)/(1+parseFloat(f.gszzl)/100)) * f.shares).toFixed(2));
             
@@ -696,15 +693,14 @@
                 return t ? t.split(' ')[0] : '--';
             }
 
-            const saveData = () => localStorage.setItem('myFunds_V5_MultiSource', JSON.stringify(funds.value));
+            const saveData = () => localStorage.setItem('myFunds_V6_FinalFixed', JSON.stringify(funds.value));
             const manualRefresh = () => { funds.value.forEach(f => fetchFundData(f.code)); if(selectedFundCode.value) fetchDetailData(selectedFundCode.value); };
 
             onMounted(() => {
-                const d = localStorage.getItem('myFunds_V5_MultiSource');
+                const d = localStorage.getItem('myFunds_V6_FinalFixed');
                 if(d) funds.value = JSON.parse(d);
                 else funds.value = [{code:'000001', name:'示例基金', shares:0, gszzl:'0.00', gsz:'1.000'}];
                 
-                // 首次加载所有数据
                 manualRefresh();
                 
                 setInterval(() => { 
