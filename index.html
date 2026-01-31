@@ -3,18 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的基金实盘 (淘宝源极速版)</title>
+    <title>我的基金实盘 (Pro Trader Layout)</title>
     
     <script>
         window.onerror = function(msg, url, line, col, error) {
-            var log = document.getElementById('error-log');
-            if(log) {
-                log.style.display = 'block';
-                log.innerHTML += "错误: " + msg + "<br>位置: " + line + ":" + col + "<br><br>";
-            }
-            // 只要出错，强制显示界面，防止白屏
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('app').style.display = 'block';
+            var btn = document.getElementById('force-btn');
+            if(btn) btn.style.display = 'block';
+            console.error(msg, line);
         };
     </script>
 
@@ -22,557 +17,238 @@
     <script src="https://registry.npmmirror.com/echarts/5.4.3/files/dist/echarts.min.js"></script>
     
     <style>
-        /* --- 原生 CSS 样式 (无需加载外部 CSS 文件) --- */
         :root {
-            --bg-color: #0B0E14;
-            --card-bg: #151b28; /*稍微调亮一点卡片背景，增加层次*/
-            --border-color: #2d3748;
-            --text-main: #e2e8f0;
-            --text-sub: #94a3b8;
-            --accent-blue: #3b82f6;
-            --up-color: #ef4444; /* 鲜艳红 */
-            --down-color: #10b981; /* 鲜艳绿 */
+            --bg-color: #050505; /* 极黑背景，更专业 */
+            --panel-bg: #101014;
+            --border-color: #1f1f1f;
+            --highlight-bg: #1a1a20;
+            --text-main: #e0e0e0;
+            --text-sub: #757575;
+            --accent: #2979ff; /* 终端蓝 */
+            --up: #ff333a;
+            --down: #00c853;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
         
         body { 
-            font-family: "PingFang SC", "Microsoft YaHei", sans-serif; 
+            font-family: "SF Mono", "Consolas", "Microsoft YaHei", sans-serif; /* 优先等宽字体，更像交易终端 */
             background-color: var(--bg-color); 
             color: var(--text-main);
             height: 100vh;
             overflow: hidden;
+            font-size: 12px; /* 全局字体缩小 */
         }
 
-        /* 布局系统 Grid Layout - 严格按照你的设计图 */
-        .app-layout {
+        /* --- 核心布局 (Grid) --- */
+        .layout {
             display: grid;
-            grid-template-columns: 1fr 280px; /* 左侧自适应，右侧资讯栏固定 280px */
-            grid-template-rows: 80px 1fr 300px; /* 顶栏(大一点), 列表, K线图 */
-            gap: 16px;
-            padding: 20px;
-            height: 100vh;
-            max-width: 1920px;
-            margin: 0 auto;
+            grid-template-columns: 240px 1fr 280px; /* 左(资讯) 中(数据) 右(操作) */
+            grid-template-rows: 100vh;
+            gap: 4px; /* 极窄间距 */
+            padding: 4px;
         }
 
-        /* 通用卡片 */
-        .card {
-            background-color: var(--card-bg);
+        /* 通用面板样式 */
+        .panel {
+            background: var(--panel-bg);
             border: 1px solid var(--border-color);
-            border-radius: 8px; /* 圆角稍微大一点 */
-            position: relative;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-        }
-
-        /* 1. 顶部数据栏 (蓝色框区域) */
-        .header {
-            grid-column: 1 / 2; /* 只在左侧区域 */
-            display: flex;
-            align-items: center;
-            justify-content: space-around;
-            padding: 0 40px;
-            background: linear-gradient(to bottom, #1a202c, #151b28);
-        }
-        
-        .stat-block { text-align: center; }
-        .stat-title { font-size: 13px; color: var(--text-sub); margin-bottom: 6px; }
-        .stat-num { font-size: 28px; font-weight: bold; font-family: monospace; letter-spacing: 1px; }
-        
-        /* 2. 基金列表区 (黄色框区域) */
-        .main-list {
-            position: relative;
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            position: relative;
+        }
+        .panel-header {
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 8px;
+            background: #15151a;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 11px;
+            color: var(--accent);
+            font-weight: bold;
+            letter-spacing: 0.5px;
         }
 
-        .search-wrapper { margin-bottom: 12px; position: relative; z-index: 50; }
-        .search-input {
-            width: 100%; background: #0f131a; border: 1px solid var(--border-color);
-            color: white; padding: 10px 16px; border-radius: 6px; outline: none; font-size: 13px;
-            transition: border-color 0.2s;
+        /* --- 左侧：7x24 快讯 --- */
+        .col-news { grid-column: 1 / 2; }
+        .news-scroll { flex: 1; overflow-y: auto; padding: 0 8px; }
+        .news-item {
+            padding: 10px 0;
+            border-bottom: 1px dashed #222;
         }
-        .search-input:focus { border-color: var(--accent-blue); }
-        
-        .search-dropdown {
-            position: absolute; top: 100%; left: 0; width: 100%;
-            background: #1e293b; border: 1px solid var(--border-color);
-            max-height: 300px; overflow-y: auto; border-radius: 6px; margin-top: 4px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
-        }
-        .search-item {
-            padding: 10px 16px; cursor: pointer; display: flex; justify-content: space-between; font-size: 13px;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-        }
-        .search-item:hover { background: #334155; }
+        .news-time { color: var(--text-sub); font-size: 10px; margin-bottom: 2px; display: flex; align-items: center; gap:4px; }
+        .news-time::before { content:''; display:block; width:4px; height:4px; background:var(--accent); border-radius:50%; }
+        .news-content { color: #ccc; line-height: 1.4; font-size: 11px; }
+        .news-content:hover { color: #fff; cursor: pointer; }
 
-        /* 网格优化：小卡片 */
-        .fund-grid {
+        /* --- 中间：核心数据区 --- */
+        .col-center {
+            grid-column: 2 / 3;
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); /* 宽度自适应 */
-            gap: 12px;
-            overflow-y: auto;
-            padding-right: 4px; /* 滚动条间隙 */
-        }
-        .fund-grid::-webkit-scrollbar { width: 6px; }
-        .fund-grid::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-
-        .fund-card {
-            padding: 16px; 
-            cursor: pointer; 
-            transition: all 0.2s; 
-            border: 1px solid transparent;
-            background: #111827;
-        }
-        .fund-card:hover { border-color: #475569; transform: translateY(-1px); }
-        .fund-card.active { 
-            border-color: var(--accent-blue); 
-            background-color: rgba(59, 130, 246, 0.08);
-            box-shadow: 0 0 0 1px var(--accent-blue);
+            grid-template-rows: 50px 1fr 1fr; /* 顶部收益, 中间(列表|K线), 底部(历史|持仓) */
+            gap: 4px;
         }
 
-        .f-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-        .f-name { font-size: 14px; font-weight: bold; color: #f1f5f9; width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .f-code { font-size: 11px; color: #64748b; margin-top: 2px; display: inline-block; background: #1e293b; padding: 1px 4px; border-radius: 3px; }
-        .f-percent { font-size: 16px; font-weight: bold; font-family: monospace; }
-        .f-label { font-size: 10px; color: #64748b; text-align: right; margin-top: 2px; }
-
-        .f-bottom { 
-            display: flex; justify-content: space-between; align-items: flex-end; 
-            padding-top: 10px; border-top: 1px dashed #334155;
+        /* 1. 顶部收益条 */
+        .top-bar {
+            background: var(--highlight-bg);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 40px;
         }
-        .f-val-label { font-size: 11px; color: #64748b; margin-bottom: 2px; }
-        .f-val { font-size: 13px; font-family: monospace; color: #cbd5e1; }
-        .f-input { 
-            background: transparent; border: none; border-bottom: 1px solid #475569; 
-            color: white; width: 70px; font-family: monospace; outline: none; font-size: 13px;
-        }
-        .f-input:focus { border-color: var(--accent-blue); }
+        .top-stat { text-align: center; }
+        .top-label { color: var(--text-sub); font-size: 10px; margin-bottom: 2px; text-transform: uppercase; }
+        .top-val { font-size: 20px; font-weight: bold; font-family: 'Consolas', monospace; }
 
-        .btn-close { position: absolute; top: 4px; right: 4px; color: #475569; background: none; border: none; cursor: pointer; opacity: 0; }
-        .fund-card:hover .btn-close { opacity: 1; }
-        .btn-close:hover { color: var(--up-color); }
-
-        /* 3. 底部 K线图 (红色框区域) */
-        .chart-box {
-            grid-column: 1 / 2;
-            display: flex; flex-direction: column;
-            padding: 10px;
+        /* 2. 中间层：基金列表 + K线 (左右分栏) */
+        .row-middle {
+            display: grid;
+            grid-template-columns: 280px 1fr; /* 列表窄，K线宽 */
+            gap: 4px;
         }
-        .chart-info { display: flex; justify-content: space-between; padding: 0 10px 5px; border-bottom: 1px solid #2d3748; margin-bottom: 5px; }
-        #mainChart { flex: 1; width: 100%; min-height: 0; }
 
-        /* 4. 右侧资讯 (绿色框区域) */
-        .sidebar {
-            grid-row: 1 / 4; /* 占满右侧所有行 */
-            display: flex; flex-direction: column;
+        /* 基金列表 (紧凑模式) */
+        .fund-list { overflow-y: auto; }
+        .fund-item {
+            padding: 8px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background 0.1s;
         }
-        .side-header { 
-            padding: 15px; border-bottom: 1px solid var(--border-color); font-weight: bold; font-size: 14px; color: var(--accent-blue);
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        .news-container { flex: 1; overflow-y: auto; padding: 0 15px; }
-        .news-item { padding: 15px 0; border-bottom: 1px solid #1e293b; }
-        .news-time { font-size: 11px; color: #64748b; margin-bottom: 4px; font-family: monospace; }
-        .news-txt { font-size: 13px; line-height: 1.5; color: #cbd5e1; transition: color 0.2s; cursor: pointer; }
-        .news-txt:hover { color: var(--accent-blue); }
+        .fund-item:hover { background: #1a1a1a; }
+        .fund-item.active { background: #0d1b2e; border-left: 2px solid var(--accent); }
+        
+        .fi-row { display: flex; justify-content: space-between; align-items: baseline; }
+        .fi-name { font-weight: bold; color: #ddd; max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .fi-rate { font-family: 'Consolas', monospace; font-weight: bold; font-size: 13px; }
+        .fi-info { font-size: 10px; color: #555; margin-top: 2px; font-family: 'Consolas', monospace;}
 
-        /* 辅助类 */
-        .text-up { color: var(--up-color); }
-        .text-down { color: var(--down-color); }
-        .add-btn {
-            border: 1px dashed #475569; color: #64748b; height: 100px;
-            display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 8px;
-            transition: all 0.2s;
-        }
-        .add-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); background: rgba(59,130,246,0.05); }
+        /* K线图容器 */
+        .chart-box { position: relative; }
+        #mainChart { width: 100%; height: 100%; }
 
-        /* 弹窗 */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 999; }
-        .modal { background: #1e293b; padding: 24px; border-radius: 8px; width: 340px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+        /* 3. 底部层：历史净值 + 重仓持股 (左右分栏) */
+        .row-bottom {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+        }
+        /* 表格样式 */
+        .data-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        .data-table th { text-align: right; color: #555; padding: 4px 8px; font-weight: normal; border-bottom: 1px solid #222; position: sticky; top: 0; background: var(--panel-bg); }
+        .data-table td { text-align: right; color: #aaa; padding: 4px 8px; border-bottom: 1px solid #1a1a1a; font-family: 'Consolas', monospace; }
+        .data-table tr:hover td { background: #1a1a1a; color: #fff; }
+
+        /* --- 右侧：操作面板 --- */
+        .col-action { grid-column: 3 / 4; display: flex; flex-direction: column; gap: 4px; }
+        
+        .action-box { padding: 12px; gap: 12px; display: flex; flex-direction: column; }
+        
+        .input-group { margin-bottom: 8px; }
+        .input-label { display: block; color: var(--text-sub); font-size: 10px; margin-bottom: 4px; }
+        .input-field { 
+            width: 100%; background: #000; border: 1px solid #333; color: #fff; 
+            padding: 6px; font-family: 'Consolas', monospace; font-size: 12px; outline: none;
+        }
+        .input-field:focus { border-color: var(--accent); }
+
+        .btn { 
+            width: 100%; padding: 8px; border: none; cursor: pointer; font-size: 12px; font-weight: bold;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .btn-blue { background: #1a237e; color: #536dfe; border: 1px solid #1a237e; }
+        .btn-blue:hover { background: #283593; color: #fff; }
+        .btn-red { background: #3b0b0b; color: #ff5252; border: 1px solid #3b0b0b; }
+        .btn-red:hover { background: #5c1010; color: #fff; }
+        
+        /* 颜色类 */
+        .t-up { color: var(--up); }
+        .t-down { color: var(--down); }
+        .dim { opacity: 0.5; }
+
+        /* 滚动条 */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+
+        /* 加载页 */
+        #loading { position: fixed; inset: 0; background: #000; z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
 
-<div id="loading" style="position:fixed; inset:0; background:#000; z-index:9999; display:flex; flex-direction:column; justify-content:center; align-items:center; transition: opacity 0.5s;">
-    <div style="color:white; font-size:16px; margin-bottom:20px;">正在连接国内高速节点...</div>
-    <button id="force-btn" onclick="document.getElementById('loading').style.display='none';document.getElementById('app').style.display='block'" 
-            style="display:none; padding:8px 20px; background:#333; color:#ccc; border:1px solid #555; border-radius:4px; cursor:pointer;">
-        如果长时间卡顿，点此强制进入
+<div id="loading">
+    <div style="color:var(--accent); font-family:'Consolas'; margin-bottom:10px;">> CONNECTING TO MARKET DATA...</div>
+    <div style="color:#444; font-size:10px;">SERVER: TAOBAO NPM MIRROR</div>
+    <button id="force-btn" onclick="document.getElementById('loading').style.display='none'" style="display:none; margin-top:20px; background:none; border:1px solid #333; color:#666; padding:5px 10px; cursor:pointer;">
+        [FORCE ENTER]
     </button>
-    <div id="error-log" style="display:none; color:#ff4444; font-size:12px; margin-top:20px; text-align:left; max-width:80%;"></div>
 </div>
 
-<script>
-    // 3秒后显示强制按钮
-    setTimeout(function(){
-        var btn = document.getElementById('force-btn');
-        if(btn) btn.style.display = 'block';
-    }, 3000);
-</script>
-
-<div id="app" style="display: none;">
-    <div class="app-layout">
+<div id="app" style="display:none;">
+    <div class="layout">
         
-        <header class="card header">
-            <div class="stat-block">
-                <div class="stat-title">预估今日收益</div>
-                <div class="stat-num" :class="totalDailyProfit >= 0 ? 'text-up' : 'text-down'">
-                    {{ totalDailyProfit >= 0 ? '+' : '' }}{{ totalDailyProfit }}
-                </div>
+        <aside class="panel col-news">
+            <div class="panel-header">
+                <span>GLOBAL NEWS WIRE</span>
+                <span style="width:6px; height:6px; background:var(--down); border-radius:50%; box-shadow:0 0 5px var(--down);"></span>
             </div>
-            
-            <div style="width:1px; height:40px; background:var(--border-color)"></div>
-
-            <div class="stat-block">
-                <div class="stat-title">
-                    持有总金额
-                    <span @click="togglePrivacy" style="cursor: pointer; margin-left:4px; font-size:12px;">
-                        {{ settings.privacyMode ? '🔒' : '👁️' }}
-                    </span>
-                </div>
-                <div class="stat-num" style="color: #f8fafc;">
-                    {{ settings.privacyMode ? '****' : totalAmount }}
-                </div>
-            </div>
-
-            <div style="width:1px; height:40px; background:var(--border-color)"></div>
-
-            <div class="stat-block">
-                <div class="stat-title">上次更新</div>
-                <div class="stat-num" style="font-size:20px; margin-top:6px; color:#94a3b8;">
-                    {{ lastUpdateTime }}
-                </div>
-            </div>
-
-            <div style="position:absolute; right:20px; top:25px; display:flex; gap:10px;">
-                 <button @click="manualRefresh" title="刷新" style="background:#3b82f6; color:white; border:none; width:32px; height:32px; border-radius:4px; cursor:pointer;">↻</button>
-                 <button @click="showSettings = true" title="设置" style="background:#334155; color:white; border:none; width:32px; height:32px; border-radius:4px; cursor:pointer;">⚙</button>
-            </div>
-        </header>
-
-        <main class="main-list">
-            <div class="search-wrapper">
-                <input v-model="searchInput" @input="handleSearch" class="search-input" placeholder="输入代码 (如 009052) 或名称添加基金...">
-                <div v-if="searchResults.length" class="search-dropdown">
-                    <div v-for="res in searchResults" @click="addFund(res)" class="search-item">
-                        <span style="color:#e2e8f0">{{ res.NAME }}</span>
-                        <span style="font-family:monospace; color:#94a3b8">{{ res.CODE }}</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="fund-grid">
-                <div v-for="(fund, index) in funds" :key="fund.code" 
-                     @click="selectFund(fund)"
-                     class="card fund-card"
-                     :class="{ 'active': selectedFundCode === fund.code }">
-                    
-                    <button @click.stop="removeFund(index)" class="btn-close">✕</button>
-
-                    <div class="f-top">
-                        <div>
-                            <div class="f-name" :title="fund.name">{{ fund.name }}</div>
-                            <span class="f-code">{{ fund.code }}</span>
-                        </div>
-                        <div>
-                            <div class="f-percent" :class="fund.gszzl >= 0 ? 'text-up' : 'text-down'">{{ fund.gszzl }}%</div>
-                            <div class="f-label">估算涨幅</div>
-                        </div>
-                    </div>
-
-                    <div class="f-bottom">
-                        <div>
-                            <div class="f-val-label">持仓金额</div>
-                            <div v-if="!settings.privacyMode">
-                                <input type="number" v-model.number="fund.holdAmount" @click.stop @change="saveData" class="f-input" placeholder="0">
-                            </div>
-                            <div v-else style="font-size:13px; color:#475569">****</div>
-                        </div>
-                        <div style="text-align:right">
-                            <div class="f-val-label">预估收益</div>
-                            <div class="f-val" style="font-weight:bold" :class="calcProfit(fund) >= 0 ? 'text-up' : 'text-down'">
-                                {{ settings.privacyMode ? '***' : calcProfit(fund) }}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.05)">
-                         <div>
-                             <div class="f-val-label">实时净值</div>
-                             <div class="f-val">{{ fund.gsz }}</div>
-                         </div>
-                         <div style="text-align:right">
-                             <div class="f-val-label">昨日净值</div>
-                             <div class="f-val" style="color:#64748b">{{ fund.dwjz }}</div>
-                         </div>
-                    </div>
-                </div>
-
-                <div @click="$el.parentElement.previousElementSibling.querySelector('input').focus()" class="add-btn">
-                    + 添加
-                </div>
-            </div>
-        </main>
-
-        <footer class="card chart-box">
-            <div class="chart-info">
-                <div style="font-weight:bold; color:#e2e8f0; font-size:14px;">
-                    {{ getSelectedFundName() || '点击上方基金查看分时走势' }}
-                    <span v-if="selectedFundCode" style="font-size:12px; color:#64748b; margin-left:10px;">{{ selectedFundCode }}</span>
-                </div>
-                <div style="font-size:12px; color:#64748b">拖拽下方滑块查看历史</div>
-            </div>
-            <div id="mainChart"></div>
-        </footer>
-
-        <aside class="card sidebar">
-            <div class="side-header">
-                <span>7x24 快讯</span>
-                <span style="font-size:10px; padding:2px 6px; background:rgba(16, 185, 129, 0.1); color:#10b981; border-radius:4px;">LIVE</span>
-            </div>
-            <div class="news-container">
+            <div class="news-scroll">
                 <div v-for="(news, i) in newsList" :key="i" class="news-item">
-                    <div class="news-time">{{ news.time }}</div>
-                    <div class="news-txt">{{ news.title }}</div>
+                    <div class="news-time">{{ news.time }} CST</div>
+                    <div class="news-content">{{ news.title }}</div>
                 </div>
             </div>
         </aside>
 
-    </div>
-
-    <div v-if="showSettings" class="modal-overlay" @click.self="showSettings = false">
-        <div class="modal">
-            <h3 style="color:white; margin-bottom:20px;">系统设置</h3>
-            <div style="margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
-                <span style="color:#cbd5e1; font-size:14px;">数据源</span>
-                <select v-model="settings.dataSource" @change="manualRefresh" style="background:#0f131a; color:white; border:1px solid #334155; padding:4px 8px; border-radius:4px;">
-                    <option value="eastmoney">天天基金</option>
-                    <option value="sina">新浪财经</option>
-                </select>
-            </div>
-            <div style="margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
-                <span style="color:#cbd5e1; font-size:14px;">隐私模式</span>
-                <input type="checkbox" v-model="settings.privacyMode" style="width:16px; height:16px;">
-            </div>
-            <button @click="showSettings = false" style="width:100%; padding:8px; background:#3b82f6; color:white; border:none; border-radius:4px; margin-top:10px; cursor:pointer;">确认</button>
-        </div>
-    </div>
-</div>
-
-<script>
-    const { createApp, ref, computed, onMounted, nextTick } = Vue;
-
-    createApp({
-        setup() {
-            const funds = ref([]);
-            const selectedFundCode = ref(null);
-            const searchInput = ref("");
-            const searchResults = ref([]);
-            const lastUpdateTime = ref("--:--");
-            const showSettings = ref(false);
-            const chartHistory = ref({}); 
-            const settings = ref({ privacyMode: false, dataSource: 'eastmoney' });
-
-            const newsList = ref([
-                {time: '15:30', title: '收盘：创业板指涨超1%，AI应用方向掀涨停潮'},
-                {time: '14:45', title: '北向资金全天净买入超50亿元'},
-                {time: '14:10', title: '光刻机概念震荡走强，张江高科涨停'},
-                {time: '13:20', title: '港股恒生科技指数午后涨幅扩大至2%'},
-                {time: '11:30', title: '白酒板块探底回升，贵州茅台翻红'},
-            ]);
-
-            let chartInstance = null;
-
-            // 天天基金
-            const fetchEastMoney = (code) => {
-                const ts = new Date().getTime();
-                const script = document.createElement('script');
-                script.src = `https://fundgz.1234567.com.cn/js/${code}.js?rt=${ts}`;
-                document.body.appendChild(script);
-                script.onload = () => document.body.removeChild(script);
-            };
-
-            // 新浪财经
-            const fetchSina = (code) => {
-                const script = document.createElement('script');
-                script.src = `https://hq.sinajs.cn/list=f_${code}`;
-                script.onload = () => {
-                    const varName = `hq_str_f_${code}`;
-                    if (window[varName]) {
-                        const arr = window[varName].split(',');
-                        if(arr.length > 1) {
-                            processFundData({
-                                fundcode: code,
-                                name: arr[0],
-                                dwjz: arr[3], 
-                                gsz: arr[1],  
-                                gszzl: ((parseFloat(arr[1]) - parseFloat(arr[3])) / parseFloat(arr[3]) * 100).toFixed(2),
-                                gztime: arr[4] 
-                            });
-                        }
-                    }
-                    document.body.removeChild(script);
-                };
-                document.body.appendChild(script);
-            };
-
-            window.jsonpgz = (data) => { processFundData(data); };
-
-            const processFundData = (data) => {
-                const target = funds.value.find(f => f.code === data.fundcode);
-                if (target) {
-                    target.name = data.name;
-                    target.dwjz = data.dwjz;
-                    target.gsz = data.gsz;
-                    target.gszzl = data.gszzl;
-                    recordChartData(target.code, data.gsz);
-                    if (selectedFundCode.value === target.code) renderChart();
-                }
-            };
-
-            const manualRefresh = () => {
-                funds.value.forEach(f => {
-                    if (settings.value.dataSource === 'eastmoney') fetchEastMoney(f.code);
-                    else fetchSina(f.code);
-                });
-                lastUpdateTime.value = new Date().toLocaleTimeString();
-            };
-
-            const handleSearch = () => {
-                if(searchInput.value.length < 2) { searchResults.value = []; return; }
-                const ts = new Date().getTime();
-                const script = document.createElement('script');
-                window.FundSearchCallBack = (data) => {
-                    searchResults.value = data.Datas || [];
-                    document.body.removeChild(script);
-                };
-                script.src = `https://fundsuggest.eastmoney.com/FundSearch/api/FundSearchAPI.ashx?m=1&key=${encodeURIComponent(searchInput.value)}&callback=FundSearchCallBack&_=${ts}`;
-                document.body.appendChild(script);
-            };
-
-            const addFund = (res) => {
-                if (!funds.value.find(f => f.code === res.CODE)) {
-                    funds.value.push({ code: res.CODE, name: res.NAME, holdAmount: 0, gszzl: "0.00", gsz: "0.00", dwjz: "--" });
-                    saveData();
-                    manualRefresh();
-                }
-                searchInput.value = ""; searchResults.value = [];
-            };
-
-            const recordChartData = (code, value) => {
-                if (!chartHistory.value[code]) chartHistory.value[code] = [];
-                const arr = chartHistory.value[code];
-                const now = new Date();
-                const timeStr = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`;
-                if (arr.length > 0 && arr[arr.length - 1].time === timeStr) return;
-                arr.push({ time: timeStr, value: value });
-                if (arr.length > 200) arr.shift();
-            };
-
-            const renderChart = () => {
-                if (!selectedFundCode.value) return;
-                const dom = document.getElementById('mainChart');
-                if (!dom) return;
-                if (!chartInstance) chartInstance = echarts.init(dom, 'dark');
-
-                const data = chartHistory.value[selectedFundCode.value] || [];
-                const color = (data.length > 1 && parseFloat(data[data.length-1].value) >= parseFloat(data[0].value)) ? '#ef4444' : '#10b981';
-
-                chartInstance.setOption({
-                    backgroundColor: 'transparent',
-                    grid: { top: 20, left: 10, right: 10, bottom: 40 },
-                    tooltip: { trigger: 'axis' },
-                    xAxis: { type: 'category', data: data.map(i=>i.time), boundaryGap: false },
-                    yAxis: { type: 'value', scale: true, splitLine: { show: true, lineStyle: { color: '#334155', type:'dashed' } } },
-                    dataZoom: [{ type: 'slider', height: 20, bottom: 0, borderColor: '#334155' }],
-                    series: [{
-                        type: 'line', data: data.map(i=>i.value), smooth: true, showSymbol: false,
-                        lineStyle: { color: color, width: 2 },
-                        areaStyle: {
-                            color: new echarts.graphic.LinearGradient(0,0,0,1, [{offset:0,color:color},{offset:1,color:'transparent'}]), 
-                            opacity: 0.2 
-                        }
-                    }]
-                });
-            };
-
-            const selectFund = (fund) => {
-                selectedFundCode.value = fund.code;
-                nextTick(() => { 
-                    if(chartInstance) chartInstance.resize(); 
-                    renderChart(); 
-                });
-            };
-
-            const calcProfit = (fund) => {
-                if(!fund.holdAmount) return "0.00";
-                return (fund.holdAmount * (parseFloat(fund.gszzl)/100)).toFixed(2);
-            };
-
-            const totalDailyProfit = computed(() => funds.value.reduce((acc, f) => acc + parseFloat(calcProfit(f)), 0).toFixed(2));
-            const totalAmount = computed(() => funds.value.reduce((acc, f) => acc + (f.holdAmount || 0), 0).toFixed(2));
-            const getSelectedFundName = () => funds.value.find(i => i.code === selectedFundCode.value)?.name || '';
-
-            const saveData = () => {
-                localStorage.setItem('myFundsPro_v5', JSON.stringify(funds.value));
-                localStorage.setItem('mySettings_v5', JSON.stringify(settings.value));
-            };
+        <main class="col-center">
             
-            const loadData = () => {
-                const d = localStorage.getItem('myFundsPro_v5');
-                if(d) funds.value = JSON.parse(d);
-                else funds.value = [{code:'009052', name:'诺安成长混合', holdAmount: 0, gszzl: '0.00', gsz: '0.000', dwjz: '0.000'}];
-                
-                const s = localStorage.getItem('mySettings_v5');
-                if(s) settings.value = JSON.parse(s);
+            <div class="top-bar">
+                <div class="top-stat">
+                    <div class="top-label">TOTAL PROFIT (CNY)</div>
+                    <div class="top-val" :class="totalDailyProfit >= 0 ? 't-up' : 't-down'">
+                        {{ totalDailyProfit >= 0 ? '+' : '' }}{{ totalDailyProfit }}
+                    </div>
+                </div>
+                <div class="top-stat">
+                    <div class="top-label">TOTAL ASSETS</div>
+                    <div class="top-val" style="color: #fff;">
+                        {{ settings.privacyMode ? '********' : totalAmount }}
+                        <span @click="togglePrivacy" style="font-size:10px; cursor:pointer; color:#555; vertical-align:middle; margin-left:4px;">
+                            {{ settings.privacyMode ? '[SHOW]' : '[HIDE]' }}
+                        </span>
+                    </div>
+                </div>
+                <div class="top-stat">
+                    <div class="top-label">YIELD RATE</div>
+                    <div class="top-val" :class="totalYieldRate >= 0 ? 't-up' : 't-down'">
+                        {{ totalYieldRate }}%
+                    </div>
+                </div>
+            </div>
 
-                // 假数据填充图表防止空置
-                funds.value.forEach(f => {
-                    if(!chartHistory.value[f.code]) {
-                        chartHistory.value[f.code] = [];
-                        let base = 1.0;
-                        for(let i=0; i<30; i++) {
-                            base = base * (1 + (Math.random()-0.5)*0.02);
-                            chartHistory.value[f.code].push({ time: `09:${i+30}`, value: base.toFixed(4) });
-                        }
-                    }
-                });
-                if(funds.value.length) selectFund(funds.value[0]);
-            };
-
-            const removeFund = (index) => {
-                if(confirm("删除该基金？")) {
-                    funds.value.splice(index, 1);
-                    if(funds.value.length === 0) selectedFundCode.value = null;
-                    saveData();
-                }
-            };
-            
-            const togglePrivacy = () => { settings.value.privacyMode = !settings.value.privacyMode; saveData(); };
-
-            onMounted(() => {
-                // *** 核心修复：Vue 挂载后，强制关闭加载动画 ***
-                const loading = document.getElementById('loading');
-                if(loading) loading.style.display = 'none';
-                
-                const appDiv = document.getElementById('app');
-                if(appDiv) appDiv.style.display = 'block';
-
-                loadData();
-                manualRefresh();
-                setInterval(manualRefresh, 5000);
-                window.addEventListener('resize', () => chartInstance && chartInstance.resize());
-            });
-
-            return {
-                funds, searchInput, searchResults, selectedFundCode, lastUpdateTime, settings, showSettings, newsList,
-                handleSearch, addFund, removeFund, selectFund, manualRefresh, togglePrivacy, saveData, calcProfit, 
-                totalDailyProfit, totalAmount, getSelectedFundName
-            };
-        }
-    }).mount('#app');
-</script>
-</body>
-</html>
+            <div class="row-middle">
+                <div class="panel">
+                    <div class="panel-header">
+                        <span>PORTFOLIO</span>
+                        <span style="font-size:9px; color:#555">{{ funds.length }} POSITIONS</span>
+                    </div>
+                    <div class="fund-list">
+                        <div v-for="(fund, index) in funds" :key="fund.code"
+                             @click="selectFund(fund)"
+                             class="fund-item"
+                             :class="{ 'active': selectedFundCode === fund.code }">
+                            <div class="fi-row">
+                                <span class="fi-name">{{ fund.name }}</span>
+                                <span class="fi-rate" :class="fund.gszzl >= 0 ? 't-up' : 't-down'">{{ fund.gszzl }}%</span>
+                            </div>
+                            <div class="fi-row">
+                                <span class="fi-info">{{ fund.code }}</span>
+                                <span class="fi-info">
+                                    {{ settings.privacyMode ? '****' : fund.holdAmount }}
+                                    <span v-if="!settings.privacyMode" class="
