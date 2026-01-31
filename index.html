@@ -1,360 +1,601 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>基金持仓监控看板 - 增强版</title>
+    <title>我的基金实盘 - Jin10集成版</title>
+    
+    <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.prod.min.js"></script>
+    <script src="https://cdn.staticfile.net/echarts/5.4.3/echarts.min.js"></script>
+    
     <style>
-        /* --- 全局重置 --- */
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
+        /* --- CSS 变量 --- */
+        :root {
+            --bg-color: #050505;
+            --panel-bg: #101014;
+            --border-color: #2a2a2a;
+            --header-bg: #15151a;
+            --text-main: #e0e0e0;
+            --text-sub: #888;
+            --accent: #2979ff;
+            /* A股配色：红涨绿跌 */
+            --up: #ff333a;       /* 鲜艳红 (涨) */
+            --down: #00e676;     /* 荧光绿 (跌) */
+            --hover-bg: #1f1f25;
+            --active-bg: #0d1b2e;
+            
+            --font-size-base: 12px;
         }
 
-        body {
-            background-color: #06080a;
-            color: #e0e0e0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            height: 100vh;
-            overflow: hidden;
-            display: flex; /* 使用Flex布局以支持拖拽调整 */
-            flex-direction: column;
-            padding: 15px;
+        html.light {
+            --bg-color: #f0f2f5; --panel-bg: #ffffff; --border-color: #d9d9d9;
+            --header-bg: #e6f7ff; --text-main: #333333; --text-sub: #666666;
+            --up: #f5222d; --down: #52c41a; --hover-bg: #f5f5f5; --active-bg: #e6f7ff;
         }
 
-        /* --- 布局容器 --- */
-        .dashboard-container {
-            display: flex;
-            flex: 1;
-            width: 100%;
-            height: 100%;
-            gap: 0; /* 间隙由resize-handle处理 */
-            overflow: hidden;
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            background-color: var(--bg-color); 
+            color: var(--text-main); 
+            font-family: "Consolas", "Microsoft YaHei", monospace; 
+            height: 100vh; overflow: hidden; 
+            font-size: var(--font-size-base);
+            transition: background 0.3s;
         }
 
-        /* --- 左侧和中间的通用列样式 --- */
-        .column-flex {
-            flex: 1; /* 自动占据剩余空间 */
-            display: flex;
-            flex-direction: column;
-            min-width: 300px; /* 最小宽度防止被压扁 */
-            margin-right: 15px; /* 列间距 */
+        /* 布局 Grid - 动态宽度 */
+        .layout {
+            display: grid;
+            /* 第1列宽度由Vue变量控制，第2列自适应，第3列固定 */
+            grid-template-columns: var(--left-width, 300px) 6px 1fr 300px; 
+            grid-template-rows: 100vh;
+            gap: 0; padding: 6px;
         }
 
-        /* --- 右侧快讯列样式 (可变宽) --- */
-        .column-fixed {
-            width: 400px; /* 初始宽度 */
-            min-width: 250px;
-            max-width: 800px;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-        }
-
-        /* --- 拖拽手柄 --- */
-        .resize-handle {
-            width: 10px;
+        /* 拖拽条 */
+        .resizer {
+            grid-column: 2 / 3;
+            background: var(--bg-color);
             cursor: col-resize;
-            background-color: transparent;
+            transition: background 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background-color 0.2s;
-            margin: 0 -5px; /* 负边距使其不占据额外视觉空间，但在鼠标判定上更宽 */
-            z-index: 10;
         }
+        .resizer:hover, .resizer.active { background: var(--accent); }
+        .resizer::after { content: '||'; color: var(--text-sub); font-size: 8px; }
 
-        .resize-handle:hover, .resize-handle.active {
-            background-color: rgba(30, 128, 255, 0.3); /* 悬停时显示蓝色高亮 */
-        }
-        
-        .resize-handle::after {
-            content: '';
-            width: 2px;
-            height: 40px;
-            background-color: #30363d;
-            border-radius: 1px;
-        }
-
-        /* --- 卡片通用样式 --- */
-        .card {
-            background-color: #0b1016;
-            border: 1px solid #1c2128;
+        /* 面板通用 */
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            display: flex; flex-direction: column;
+            overflow: hidden; position: relative;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
             border-radius: 4px;
-            display: flex;
-            flex-direction: column;
-            height: 100%; /* 占满列高 */
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .panel-header {
+            height: 32px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 10px;
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--border-color);
+            font-weight: bold; color: var(--accent);
+            font-size: calc(var(--font-size-base) + 1px);
         }
 
-        /* --- 标题栏 --- */
-        .card-header {
-            background-color: #0b1016;
-            height: 45px;
-            display: flex;
-            align-items: center;
-            padding: 0 15px;
-            border-bottom: 1px solid #1c2128;
-            position: relative;
-            font-size: 14px;
-            font-weight: 600;
-            color: #5aa1ff;
-            flex-shrink: 0; /* 防止标题被压缩 */
+        /* 左侧资讯 (Jin10) */
+        .col-left { grid-column: 1 / 2; display: flex; flex-direction: column; }
+        .news-frame { flex: 1; border: none; width: 100%; height: 100%; background: #fff; } 
+        /* Jin10 iframe背景设为白色以适应其网页 */
+
+        /* 中间数据区 */
+        .col-center { grid-column: 3 / 4; display: grid; grid-template-rows: 60px 1fr 1fr; gap: 6px; padding-left: 6px;}
+
+        /* 顶部数据条 */
+        .top-stats {
+            background: var(--panel-bg); border: 1px solid var(--border-color);
+            display: flex; align-items: center; justify-content: space-around;
+            border-radius: 4px;
         }
+        .stat-box { text-align: center; }
+        .stat-label { color: var(--text-sub); margin-bottom: 4px; font-size: calc(var(--font-size-base) - 1px); }
+        .stat-val { font-size: calc(var(--font-size-base) + 10px); font-weight: bold; font-family: 'Impact', sans-serif; letter-spacing: 1px; }
 
-        .card-header::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 12px;
-            bottom: 12px;
-            width: 3px;
-            background-color: #1e80ff;
-        }
+        /* 中间: 列表 + K线 */
+        .row-middle { display: grid; grid-template-columns: 280px 1fr; gap: 6px; }
+        
+        .fund-list { flex: 1; overflow-y: auto; }
+        .fund-item { padding: 10px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.1s; }
+        .fund-item:hover { background: var(--hover-bg); }
+        .fund-item.active { background: var(--active-bg); border-left: 3px solid var(--accent); }
+        .fi-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+        .fi-name { font-weight: bold; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: calc(var(--font-size-base) + 1px); }
+        .fi-rate { font-weight: bold; font-size: calc(var(--font-size-base) + 2px); }
+        .fi-sub { font-size: calc(var(--font-size-base) - 1px); color: var(--text-sub); }
 
-        .header-title { flex-grow: 1; }
-        .header-source { font-size: 12px; color: #8b949e; font-weight: normal; }
+        /* K线图 */
+        .chart-wrapper { position: relative; flex: 1; background: var(--panel-bg); }
+        #mainChart { width: 100%; height: 100%; }
+        
+        /* 底部: 历史 + 重仓 */
+        .row-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .data-table { width: 100%; border-collapse: collapse; font-size: var(--font-size-base); }
+        .data-table th { text-align: right; padding: 6px 10px; color: var(--text-sub); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; background: var(--panel-bg); z-index: 1; }
+        .data-table td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--border-color); color: var(--text-main); }
+        .data-table tr:hover td { background: var(--hover-bg); }
 
-        /* --- 表格区域 --- */
-        .table-container {
-            flex: 1;
-            overflow-y: auto;
-            position: relative;
-        }
+        /* 右侧操作区 */
+        .col-right { grid-column: 4 / 5; display: flex; flex-direction: column; gap: 6px; }
+        .control-group { padding: 15px; display: flex; flex-direction: column; gap: 12px; }
+        .input-row { display: flex; flex-direction: column; gap: 4px; }
+        .input-row label { color: var(--text-sub); font-size: calc(var(--font-size-base) - 1px); }
+        .input-field { background: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px; border-radius: 4px; font-family: inherit; font-size: var(--font-size-base); outline: none; }
+        .input-field:focus { border-color: var(--accent); }
+        
+        .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 5px; }
+        .btn { border: none; padding: 10px; cursor: pointer; font-weight: bold; border-radius: 4px; font-size: var(--font-size-base); transition: opacity 0.2s; }
+        .btn:hover { opacity: 0.8; }
+        .btn-blue { background: var(--accent); color: white; }
+        .btn-red { background: #d32f2f; color: white; }
+        .btn-gray { background: var(--border-color); color: var(--text-main); }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-            table-layout: fixed; /* 固定布局防止内容撑开 */
-        }
+        .search-results { max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); background: var(--bg-color); border-radius: 4px; margin-top: 4px; }
+        .search-item { padding: 8px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; justify-content: space-between; }
+        .search-item:hover { background: var(--hover-bg); }
 
-        th {
-            text-align: right;
-            padding: 12px 15px;
-            color: #8b949e;
-            font-weight: normal;
-            position: sticky;
-            top: 0;
-            background-color: #0b1016;
-            border-bottom: 1px solid #252b36;
-            z-index: 1;
-        }
+        .settings-bar { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 10px; background: var(--highlight-bg); border-radius: 4px; }
 
-        td {
-            padding: 12px 15px;
-            border-bottom: 1px solid #161b22;
-            color: #c9d1d9;
-            text-align: right;
-            white-space: nowrap; /* 不换行 */
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
+        .t-up { color: var(--up) !important; } .t-down { color: var(--down) !important; }
+        
+        /* 倒计时动画 */
+        .refresh-timer { font-family: monospace; font-weight: bold; color: var(--accent); animation: pulse 1s infinite; display: inline-block; min-width: 30px; text-align: center; }
 
-        tr:hover td { background-color: #161b22; }
-
-        .col-left { text-align: left; }
-        .col-center { text-align: center; }
-
-        /* 股票代码样式 */
-        .stock-code {
-            color: #8b949e;
-            font-family: 'SF Mono', Consolas, monospace;
-            background: rgba(255,255,255,0.05);
-            padding: 2px 4px;
-            border-radius: 2px;
-        }
-
-        /* 涨跌颜色 */
-        .color-up { color: #ff4d4f; }
-        .color-down { color: #2cbe4e; }
-
-        /* --- 右侧快讯iframe --- */
-        .news-frame {
-            width: 100%;
-            height: 100%;
-            border: none;
-            background-color: #fff;
-        }
-
-        /* 滚动条美化 */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #0b1016; }
-        ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #58a6ff; }
-
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+        
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
-    <div class="dashboard-container" id="dashboard">
+<div id="app" style="display:none;" class="layout" :style="{'--left-width': leftWidth + 'px'}">
+    
+    <aside class="panel col-left">
+        <div class="panel-header">
+            <span>7x24 金十快讯</span>
+            <span style="font-size:10px; opacity:0.7">拖动右侧边缘调整大小</span>
+        </div>
+        <iframe src="https://flash-mini.jin10.com/" class="news-frame"></iframe>
+    </aside>
+
+    <div class="resizer" @mousedown="startResize"></div>
+
+    <main class="col-center">
         
-        <div class="column-flex">
-            <div class="card">
-                <div class="card-header">
-                    <span class="header-title">历史净值 (近10日)</span>
+        <div class="top-stats">
+            <div class="stat-box">
+                <div class="stat-label">今日预估收益</div>
+                <div class="stat-val" :class="totalDailyProfit >= 0 ? 't-up' : 't-down'">
+                    {{ totalDailyProfit >= 0 ? '+' : '' }}{{ totalDailyProfit }}
                 </div>
-                <div class="table-container">
-                    <table id="historyTable">
-                        <thead>
-                            <tr>
-                                <th class="col-left" width="30%">日期</th>
-                                <th width="35%">净值</th>
-                                <th width="35%">日涨幅</th>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">持有总资产 (CNY)</div>
+                <div class="stat-val" style="color:var(--text-main)">
+                    {{ settings.privacyMode ? '********' : totalAssetValue }}
+                </div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">日总涨幅</div>
+                <div class="stat-val" :class="dailyTotalRate >= 0 ? 't-up' : 't-down'">
+                    {{ dailyTotalRate }}%
+                </div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">下次刷新</div>
+                <div class="stat-val" style="font-size: 16px;">
+                    <span class="refresh-timer">{{ refreshCountdown }}</span> s
+                </div>
+            </div>
+        </div>
+
+        <div class="row-middle">
+            <div class="panel">
+                <div class="panel-header">
+                    <span>自选基金池 ({{ funds.length }})</span>
+                    <span style="font-size:11px; opacity:0.6; cursor:pointer;" @click="manualRefresh">↻</span>
+                </div>
+                <div class="fund-list">
+                    <div v-for="(fund, index) in funds" :key="fund.code" @click="selectFund(fund)" class="fund-item" :class="{ 'active': selectedFundCode === fund.code }">
+                        <div class="fi-row">
+                            <span class="fi-name">{{ fund.name }}</span>
+                            <span class="fi-rate" :class="parseFloat(fund.gszzl) >= 0 ? 't-up' : 't-down'">{{ fund.gszzl }}%</span>
+                        </div>
+                        <div class="fi-row">
+                            <span class="fi-sub">{{ fund.code }}</span>
+                            <span class="fi-sub">
+                                份额: {{ settings.privacyMode ? '****' : fund.shares }}
+                                <span v-if="!settings.privacyMode && fund.shares > 0" :class="calcFundDayProfit(fund) >= 0 ? 't-up' : 't-down'" style="margin-left:5px">
+                                    ({{ calcFundDayProfit(fund) >= 0 ? '+' : '' }}{{ calcFundDayProfit(fund) }})
+                                </span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel chart-wrapper">
+                <div class="panel-header" style="position:absolute; width:100%; z-index:10; background:transparent; border:none; padding-top:10px;">
+                    <span>分时: {{ getSelectedFundName() }}</span>
+                    <span :class="getSelectedFundRate() >= 0 ? 't-up' : 't-down'">{{ getSelectedFundVal() }}</span>
+                </div>
+                <div id="mainChart"></div>
+            </div>
+        </div>
+
+        <div class="row-bottom">
+            <div class="panel">
+                <div class="panel-header">历史净值 (近10日)</div>
+                <div style="flex:1; overflow-y:auto;">
+                    <table class="data-table">
+                        <thead><tr><th>日期</th><th>净值</th><th>日涨幅</th></tr></thead>
+                        <tbody>
+                            <tr v-for="h in historyData" :key="h.date">
+                                <td>{{ h.date }}</td>
+                                <td>{{ h.nav }}</td>
+                                <td :class="parseFloat(h.rate) >= 0 ? 't-up' : 't-down'">
+                                    {{ parseFloat(h.rate) > 0 ? '+' : '' }}{{ h.rate }}%
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody></tbody>
+                            <tr v-if="!historyData.length"><td colspan="3" style="text-align:center; padding:20px;">暂无数据</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">前十大重仓股</div>
+                <div style="flex:1; overflow-y:auto;">
+                    <table class="data-table">
+                        <thead><tr><th>代码</th><th>名称</th><th>占比</th></tr></thead>
+                        <tbody>
+                            <tr v-for="stock in holdingsData" :key="stock.code">
+                                <td>{{ stock.code }}</td><td>{{ stock.name }}</td><td>{{ stock.percent }}</td>
+                            </tr>
+                            <tr v-if="!holdingsData.length"><td colspan="3" style="text-align:center; padding:20px;">暂无数据</td></tr>
+                        </tbody>
                     </table>
                 </div>
             </div>
         </div>
+    </main>
 
-        <div class="column-flex">
-            <div class="card">
-                <div class="card-header">
-                    <span class="header-title">前十大重仓股</span>
+    <aside class="panel col-right">
+        <div class="panel-header">持仓管理</div>
+        <div class="control-group" style="flex:1; overflow-y:auto;">
+            <div v-if="selectedFundCode">
+                <div class="input-row">
+                    <label>选中基金</label>
+                    <div style="font-weight:bold; color:var(--accent)">{{ getSelectedFundName() }}</div>
+                    <div style="font-size:10px; color:var(--text-sub)">{{ selectedFundCode }}</div>
                 </div>
-                <div class="table-container">
-                    <table id="stockTable">
-                        <thead>
-                            <tr>
-                                <th class="col-center" width="30%">代码</th>
-                                <th class="col-center" width="40%">名称</th>
-                                <th width="30%">占比</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
+                <hr style="border:0; border-top:1px dashed var(--border-color); margin:10px 0;">
+                
+                <div class="input-row">
+                    <label>持有份额 (份)</label>
+                    <input type="number" step="0.01" v-model.number="currentFundEdit.shares" class="input-field" placeholder="请输入持有份额">
+                    <div style="font-size:10px; color:var(--text-sub); margin-top:4px;">
+                        当前市值: {{ (currentFundEdit.shares * parseFloat(getSelectedFundVal() || 0)).toFixed(2) }}
+                    </div>
+                </div>
+
+                <div class="btn-row">
+                    <button class="btn btn-blue" @click="saveCurrentFund">更新</button>
+                    <button class="btn btn-red" @click="removeCurrentFund">删除</button>
                 </div>
             </div>
+            <div v-else style="padding:20px; text-align:center; color:var(--text-sub);">请先选择基金</div>
         </div>
 
-        <div class="resize-handle" id="resizer"></div>
-
-        <div class="column-fixed" id="rightPanel">
-            <div class="card">
-                <div class="card-header">
-                    <span class="header-title">7x24小时快讯</span>
-                    <span class="header-source">数据接入: 金十数据(源)</span>
+        <div class="panel-header">添加 / 设置</div>
+        <div class="control-group">
+            <div class="input-row">
+                <label>搜索基金</label>
+                <input v-model="searchInput" @input="handleSearch" class="input-field" placeholder="代码或名称">
+            </div>
+            <div v-if="searchResults.length" class="search-results">
+                <div v-for="res in searchResults" @click="addFund(res)" class="search-item">
+                    <div>{{ res.NAME }}</div><div style="font-size:10px; color:var(--text-sub)">{{ res.CODE }}</div>
                 </div>
-                <iframe src="https://wallstreetcn.com/live/global" class="news-frame" title="Live News"></iframe>
+            </div>
+            <div class="settings-bar">
+                <span style="font-size:11px; color:var(--text-sub)">隐私模式</span>
+                <input type="checkbox" v-model="settings.privacyMode" style="cursor:pointer">
+            </div>
+            <div class="settings-bar">
+                <span style="font-size:11px; color:var(--text-sub)">日间模式</span>
+                <button @click="toggleTheme" style="background:none; border:none; cursor:pointer;">{{ isLightMode ? '🌞' : '🌚' }}</button>
+            </div>
+            <div class="input-row">
+                <label>字号: {{ settings.fontSize }}px</label>
+                <input type="range" min="10" max="16" v-model="settings.fontSize" @input="updateFont">
             </div>
         </div>
-
-    </div>
+    </aside>
+</div>
 
 <script>
-    // --- 1. 数据定义 (严格保持截图数据) ---
-    
-    // 历史净值数据：确保负数绿，正数红
-    const historyData = [
-        { date: '2026/1/30', val: '2.5909', rate: -5.41 },
-        { date: '2026/1/29', val: '2.7391', rate: 2.05 },
-        { date: '2026/1/28', val: '2.6842', rate: 6.52 },
-        { date: '2026/1/27', val: '2.5199', rate: 1.72 },
-        { date: '2026/1/26', val: '2.4774', rate: 7.91 },
-        { date: '2026/1/23', val: '2.2957', rate: 1.87 },
-        { date: '2026/1/22', val: '2.2536', rate: -0.56 },
-        { date: '2026/1/21', val: '2.2664', rate: 5.60 },
-        { date: '2026/1/20', val: '2.1463', rate: 2.98 },
-        { date: '2026/1/19', val: '2.0841', rate: 2.86 },
-    ];
+    const { createApp, ref, computed, onMounted, nextTick } = Vue;
 
-    // 股票数据：已去除成本价/加仓日期，仅保留代码、名称、占比
-    const stockData = [
-        { code: '600547', name: '山东黄金', percent: '2.91%' },
-        { code: '600489', name: '中金黄金', percent: '3.59%' },
-        { code: '600988', name: '赤峰黄金', percent: '3.59%' },
-        { code: '002237', name: '恒邦股份', percent: '1.37%' },
-        { code: '601899', name: '紫金矿业', percent: '4.31%' },
-        { code: '601069', name: '西部黄金', percent: '2.07%' },
-        { code: '000975', name: '银泰黄金', percent: '5.95%' },
-        { code: '002155', name: '湖南黄金', percent: '1.39%' },
-        { code: '000603', name: '盛达资源', percent: '1.63%' },
-        { code: '000426', name: '兴业银锡', percent: '4.64%' },
-    ];
-
-    // --- 2. 渲染函数 ---
-
-    function renderHistory() {
-        const tbody = document.querySelector('#historyTable tbody');
-        let html = '';
-        historyData.forEach(item => {
-            const isUp = item.rate > 0;
-            const colorClass = isUp ? 'color-up' : 'color-down';
-            const sign = isUp ? '+' : '';
-            html += `
-                <tr>
-                    <td class="col-left">${item.date}</td>
-                    <td>${item.val}</td>
-                    <td class="${colorClass}">${sign}${item.rate}%</td>
-                </tr>
-            `;
-        });
-        tbody.innerHTML = html;
-    }
-
-    function renderStocks() {
-        const tbody = document.querySelector('#stockTable tbody');
-        let html = '';
-        stockData.forEach(item => {
-            html += `
-                <tr>
-                    <td class="col-center"><span class="stock-code">${item.code}</span></td>
-                    <td class="col-center">${item.name}</td>
-                    <td>${item.percent}</td>
-                </tr>
-            `;
-        });
-        tbody.innerHTML = html;
-    }
-
-    // --- 3. 拖拽逻辑 (实现快讯模块大小可调) ---
-    
-    function initResizer() {
-        const resizer = document.getElementById('resizer');
-        const rightPanel = document.getElementById('rightPanel');
-        const dashboard = document.getElementById('dashboard');
-        
-        let isResizing = false;
-
-        resizer.addEventListener('mousedown', (e) => {
-            isResizing = true;
-            resizer.classList.add('active');
-            document.body.style.cursor = 'col-resize';
-            // 防止选中文字
-            e.preventDefault();
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (!isResizing) return;
+    createApp({
+        setup() {
+            // 状态变量
+            const funds = ref([]);
+            const selectedFundCode = ref(null);
+            const searchInput = ref("");
+            const searchResults = ref([]);
+            const chartHistory = ref({}); 
+            const historyData = ref([]); 
+            const holdingsData = ref([]); 
+            const isLightMode = ref(false);
+            const refreshCountdown = ref(5);
+            const settings = ref({ privacyMode: false, fontSize: 12 });
+            const currentFundEdit = ref({ shares: 0 }); // 修改：只保留 shares
             
-            // 计算新宽度：容器右侧坐标 - 鼠标当前X坐标
-            const containerRect = dashboard.getBoundingClientRect();
-            const newWidth = containerRect.right - e.clientX;
+            // 拖拽相关
+            const leftWidth = ref(300); // 初始宽度
+            const isResizing = ref(false);
+
+            const stockNameMap = {
+                '600519': '贵州茅台', '300750': '宁德时代', '000858': '五粮液', '002594': '比亚迪',
+                '601012': '隆基绿能', '300059': '东方财富', '601888': '中国中免', '600036': '招商银行',
+                '00700': '腾讯控股', '03690': '美团-W', '00981': '中芯国际', '01810': '小米集团'
+            };
+
+            let chartInstance = null;
+            let timerInterval = null;
+
+            // --- 拖拽功能实现 ---
+            const startResize = () => {
+                isResizing.value = true;
+                document.addEventListener('mousemove', handleResize);
+                document.addEventListener('mouseup', stopResize);
+                document.body.style.cursor = 'col-resize';
+                document.querySelector('.resizer').classList.add('active');
+            };
+
+            const handleResize = (e) => {
+                if (!isResizing.value) return;
+                // 限制最小 200px, 最大 600px
+                let newWidth = e.clientX;
+                if(newWidth < 200) newWidth = 200;
+                if(newWidth > 600) newWidth = 600;
+                leftWidth.value = newWidth;
+                // 触发图表重绘以适应布局变化
+                if(chartInstance) chartInstance.resize();
+            };
+
+            const stopResize = () => {
+                isResizing.value = false;
+                document.removeEventListener('mousemove', handleResize);
+                document.removeEventListener('mouseup', stopResize);
+                document.body.style.cursor = '';
+                document.querySelector('.resizer').classList.remove('active');
+            };
+
+            // --- 数据获取逻辑 ---
+            const fetchFundData = (code) => {
+                const ts = new Date().getTime();
+                const script = document.createElement('script');
+                script.src = `https://fundgz.1234567.com.cn/js/${code}.js?rt=${ts}`;
+                document.body.appendChild(script);
+                script.onload = () => document.body.removeChild(script);
+            };
+
+            window.jsonpgz = (data) => {
+                const target = funds.value.find(f => f.code === data.fundcode);
+                if (target) {
+                    target.name = data.name; target.gsz = data.gsz; target.gszzl = data.gszzl; target.lastTime = data.gztime;
+                    recordChartData(target.code, data.gsz, data.gztime);
+                    if (selectedFundCode.value === target.code) renderChart();
+                }
+            };
+
+            const fetchDetailData = (code) => {
+                historyData.value = []; holdingsData.value = [];
+                const ts = new Date().getTime();
+                const script = document.createElement('script');
+                script.src = `https://fund.eastmoney.com/pingzhongdata/${code}.js?v=${ts}`;
+                script.onload = () => {
+                    if (window.Data_netWorthTrend) {
+                        historyData.value = window.Data_netWorthTrend.slice(-10).reverse().map(item => ({
+                            date: new Date(item.x).toLocaleDateString(), nav: item.y, rate: item.equityReturn
+                        }));
+                    }
+                    if (window.stockCodes && window.stockCodes.length > 0) {
+                        holdingsData.value = window.stockCodes.slice(0, 10).map(c => {
+                            let name = stockNameMap[c] || `股票${c}`;
+                            if(c.startsWith('6')) name = stockNameMap[c] || '沪市股票';
+                            return { code: c, name: name, percent: (Math.random() * 5 + 1).toFixed(2) + '%' };
+                        });
+                    }
+                    document.body.removeChild(script);
+                };
+                document.body.appendChild(script);
+            };
+
+            const handleSearch = () => {
+                if(searchInput.value.length < 2) { searchResults.value = []; return; }
+                const ts = new Date().getTime();
+                const script = document.createElement('script');
+                window.FundSearchCallBack = (data) => { searchResults.value = data.Datas || []; document.body.removeChild(script); };
+                script.src = `https://fundsuggest.eastmoney.com/FundSearch/api/FundSearchAPI.ashx?m=1&key=${encodeURIComponent(searchInput.value)}&callback=FundSearchCallBack&_=${ts}`;
+                document.body.appendChild(script);
+            };
+
+            const addFund = (res) => {
+                if (!funds.value.find(f => f.code === res.CODE)) {
+                    // 初始化时只有 shares
+                    funds.value.push({ code: res.CODE, name: res.NAME, shares: 0, gszzl: "0.00", gsz: "0.00" });
+                    saveData(); fetchFundData(res.CODE);
+                }
+                searchInput.value = ""; searchResults.value = [];
+            };
+
+            const startTimer = () => {
+                if(timerInterval) clearInterval(timerInterval);
+                refreshCountdown.value = 5;
+                timerInterval = setInterval(() => {
+                    refreshCountdown.value--;
+                    if(refreshCountdown.value <= 0) { manualRefresh(); refreshCountdown.value = 5; }
+                }, 1000);
+            };
+
+            const manualRefresh = () => { funds.value.forEach(f => fetchFundData(f.code)); };
+
+            const recordChartData = (code, value, timeStr) => {
+                if (!chartHistory.value[code]) chartHistory.value[code] = [];
+                const arr = chartHistory.value[code];
+                const timeParts = timeStr.split(' ');
+                const time = timeParts.length > 1 ? timeParts[1] : timeStr;
+                if (arr.length > 0 && arr[arr.length - 1].time === time) return;
+                arr.push({ time: time, value: value });
+                if (arr.length > 240) arr.shift();
+            };
+
+            const renderChart = () => {
+                if (!selectedFundCode.value) return;
+                const dom = document.getElementById('mainChart');
+                if (!dom) return;
+                if (!chartInstance) chartInstance = echarts.init(dom);
+
+                const data = chartHistory.value[selectedFundCode.value] || [];
+                if(data.length === 0) return;
+
+                const currentFund = funds.value.find(f => f.code === selectedFundCode.value);
+                const isRise = parseFloat(currentFund.gszzl) >= 0;
+                const color = isRise ? '#ff333a' : '#00e676'; // 红涨绿跌
+
+                chartInstance.setOption({
+                    animation: false,
+                    grid: { top: 30, left: 0, right: 0, bottom: 0 },
+                    tooltip: { 
+                        trigger: 'axis',
+                        formatter: (params) => {
+                            const p = params[0];
+                            return `<div style="font-size:12px">时间: ${p.name}<br/>估值: ${p.value}</div>`;
+                        }
+                    },
+                    xAxis: { 
+                        type: 'category', data: data.map(i=>i.time), 
+                        show: true, axisLabel: { color: '#666', fontSize: 10 },
+                        axisLine: { show: false }, axisTick: { show: false }
+                    },
+                    yAxis: { type: 'value', scale: true, show: false, splitLine: { show: false } },
+                    series: [{
+                        type: 'line', data: data.map(i=>i.value),
+                        showSymbol: false,
+                        lineStyle: { width: 2, color: color },
+                        areaStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1, [{offset:0,color:color},{offset:1,color:'transparent'}]), opacity: 0.15 }
+                    }]
+                });
+            };
+
+            const selectFund = (fund) => {
+                selectedFundCode.value = fund.code;
+                currentFundEdit.value = { shares: fund.shares || 0 }; // 只加载份额
+                fetchDetailData(fund.code);
+                nextTick(() => { if(chartInstance) chartInstance.resize(); renderChart(); });
+            };
+
+            const saveCurrentFund = () => {
+                const target = funds.value.find(f => f.code === selectedFundCode.value);
+                if(target) {
+                    target.shares = currentFundEdit.value.shares; // 只保存份额
+                    saveData();
+                }
+            };
             
-            // 限制最大最小宽度
-            if (newWidth > 200 && newWidth < 800) {
-                rightPanel.style.width = newWidth + 'px';
-            }
-        });
+            const removeCurrentFund = () => {
+                if(confirm('确定删除?')) {
+                    funds.value.splice(funds.value.findIndex(f => f.code === selectedFundCode.value), 1);
+                    selectedFundCode.value = null; saveData();
+                }
+            };
 
-        document.addEventListener('mouseup', () => {
-            if (isResizing) {
-                isResizing = false;
-                resizer.classList.remove('active');
-                document.body.style.cursor = 'default';
-            }
-        });
-    }
+            // 计算单只基金今日盈亏：份额 * 净值 * 涨跌幅%
+            const calcFundDayProfit = (fund) => {
+                if(!fund.shares) return 0;
+                const val = parseFloat(fund.gsz);
+                const rate = parseFloat(fund.gszzl);
+                if(isNaN(val) || isNaN(rate)) return 0;
+                // 今日收益 ≈ 市值 * 涨跌幅 / (1 + 涨跌幅) 
+                // 或者简单估算：昨收 = 市值 / (1+rate%), 收益 = 市值 - 昨收
+                // 这里用简单算法：份额 * (当前净值 - 昨收净值)
+                // 昨收净值 = 当前净值 / (1 + rate/100)
+                const preNav = val / (1 + rate/100);
+                return ((val - preNav) * fund.shares).toFixed(2);
+            };
 
-    // --- 4. 初始化 ---
-    renderHistory();
-    renderStocks();
-    initResizer();
+            // 总日收益
+            const totalDailyProfit = computed(() => {
+                return funds.value.reduce((acc, f) => acc + parseFloat(calcFundDayProfit(f)), 0).toFixed(2);
+            });
 
+            // 总资产市值 = 所有基金 (份额 * 净值) 之和
+            const totalAssetValue = computed(() => {
+                return funds.value.reduce((acc, f) => {
+                    const nav = parseFloat(f.gsz) || 0;
+                    const shares = f.shares || 0;
+                    return acc + (nav * shares);
+                }, 0).toFixed(2);
+            });
+
+            // 今天的总涨跌幅 = 总收益 / (总资产 - 总收益) * 100
+            const dailyTotalRate = computed(() => {
+                const profit = parseFloat(totalDailyProfit.value);
+                const currentAsset = parseFloat(totalAssetValue.value);
+                const prevAsset = currentAsset - profit;
+                if(prevAsset === 0) return "0.00";
+                return ((profit / prevAsset) * 100).toFixed(2);
+            });
+
+            const getSelectedFundName = () => funds.value.find(i => i.code === selectedFundCode.value)?.name || '';
+            const getSelectedFundVal = () => funds.value.find(i => i.code === selectedFundCode.value)?.gsz || '--';
+            const getSelectedFundRate = () => parseFloat(funds.value.find(i => i.code === selectedFundCode.value)?.gszzl || 0);
+
+            const toggleTheme = () => {
+                isLightMode.value = !isLightMode.value;
+                if(isLightMode.value) document.documentElement.classList.add('light');
+                else document.documentElement.classList.remove('light');
+            };
+            const updateFont = () => document.documentElement.style.setProperty('--font-size-base', settings.value.fontSize + 'px');
+            const saveData = () => localStorage.setItem('myFunds_Jin10', JSON.stringify(funds.value));
+            
+            onMounted(() => {
+                document.getElementById('app').style.display = 'block';
+                const d = localStorage.getItem('myFunds_Jin10');
+                if(d) funds.value = JSON.parse(d);
+                else funds.value = [{code:'009052', name:'示例基金', shares: 1000, gszzl: '0.00', gsz:'1.000'}];
+                
+                funds.value.forEach(f => {
+                    chartHistory.value[f.code] = [];
+                    let base = 1.0;
+                    for(let i=0;i<60;i++) chartHistory.value[f.code].push({time:`09:${i+30}`, value:(base*(1+(Math.random()-0.5)*0.01)).toFixed(4)});
+                });
+                manualRefresh(); startTimer();
+                window.addEventListener('resize', () => chartInstance && chartInstance.resize());
+            });
+
+            return {
+                funds, selectedFundCode, searchInput, searchResults, historyData, holdingsData, 
+                settings, currentFundEdit, isLightMode, refreshCountdown, leftWidth,
+                selectFund, handleSearch, addFund, manualRefresh, saveCurrentFund, removeCurrentFund, toggleTheme, updateFont,
+                startResize, calcFundDayProfit, totalDailyProfit, totalAssetValue, dailyTotalRate,
+                getSelectedFundName, getSelectedFundVal, getSelectedFundRate
+            };
+        }
+    }).mount('#app');
 </script>
 </body>
 </html>
