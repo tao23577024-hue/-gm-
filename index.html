@@ -3,141 +3,205 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的基金实盘 - 金额模式版</title>
+    <title>我的基金实盘 - Pro UI版</title>
     
     <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.prod.min.js"></script>
     <script src="https://cdn.staticfile.net/echarts/5.4.3/echarts.min.js"></script>
     
     <style>
         :root {
-            --bg-color: #050505;
-            --panel-bg: #101014;
-            --border-color: #2a2a2a;
-            --header-bg: #15151a;
-            --text-main: #e0e0e0;
-            --text-sub: #888;
-            --accent: #2979ff;
-            --up: #ff333a;       
-            --down: #00e676;     
-            --hover-bg: #1f1f25;
-            --active-bg: #0d1b2e;
+            /* 参考图片配色 */
+            --bg-body: #0b0f19;      /* 极深蓝背景 */
+            --bg-panel: #151a28;     /* 面板背景 */
+            --bg-card: #1c2233;      /* 卡片高亮背景 */
+            --bg-input: #0f131f;     /* 输入框背景 */
+            
+            --text-main: #eef2f5;    /* 主文字 */
+            --text-sub: #78859e;     /* 次要文字 */
+            --text-dim: #4a5568;     /* 暗淡文字 */
+            
+            --accent: #3b82f6;       /* 科技蓝 */
+            --accent-glow: rgba(59, 130, 246, 0.3);
+            
+            --up: #fa5252;           /* 涨 - 红 */
+            --down: #00e676;         /* 跌 - 绿 */
+            
+            --border-radius: 8px;
+            --border-soft: rgba(255,255,255,0.05);
+            
             --font-size-base: 12px;
         }
 
-        html.light {
-            --bg-color: #f0f2f5; --panel-bg: #ffffff; --border-color: #d9d9d9;
-            --header-bg: #e6f7ff; --text-main: #333333; --text-sub: #666666;
-            --up: #f5222d; --down: #52c41a; --hover-bg: #f5f5f5; --active-bg: #e6f7ff;
-        }
-
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        
         body { 
-            background-color: var(--bg-color); 
+            background-color: var(--bg-body); 
             color: var(--text-main); 
-            font-family: "Consolas", "Microsoft YaHei", monospace; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             height: 100vh; width: 100vw; overflow: hidden; 
             font-size: var(--font-size-base);
         }
 
-        #debug-console {
-            position: fixed; bottom: 0; right: 0; width: 300px; max-height: 150px;
-            background: rgba(100, 0, 0, 0.9); color: white; font-size: 10px;
-            overflow-y: auto; z-index: 9999; padding: 5px; display: none; pointer-events: none;
-        }
+        /* 滚动条美化 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4a5568; }
 
+        /* 布局网格 */
         .layout {
             display: grid;
-            grid-template-columns: 260px 1fr 200px;
-            grid-template-rows: 60px minmax(0, 1fr); 
-            gap: 4px; padding: 4px;
+            grid-template-columns: 260px 1fr 240px; 
+            grid-template-rows: 70px minmax(0, 1fr); 
+            gap: 12px; padding: 12px;
             height: 100vh;
         }
 
+        /* 通用面板样式 */
         .panel {
-            background: var(--panel-bg);
-            border: 1px solid var(--border-color);
+            background: var(--bg-panel);
+            border: 1px solid var(--border-soft);
+            border-radius: var(--border-radius);
             display: flex; flex-direction: column;
-            overflow: hidden; border-radius: 4px;
-        }
-        .panel-header {
-            height: 28px; flex-shrink: 0;
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 0 8px;
-            background: var(--header-bg);
-            border-bottom: 1px solid var(--border-color);
-            font-weight: bold; color: var(--accent);
-            font-size: var(--font-size-base);
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
 
+        .panel-header {
+            height: 36px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 12px;
+            border-bottom: 1px solid var(--border-soft);
+            font-weight: 600; color: var(--text-sub);
+            font-size: 13px;
+        }
+
+        /* --- 顶部总览条 --- */
         .top-bar {
             grid-column: 1 / 4;
-            display: flex; align-items: center; justify-content: space-around;
-            background: var(--panel-bg); border: 1px solid var(--border-color);
-            border-radius: 4px;
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+            background: transparent; border: none; box-shadow: none;
         }
-        .stat-box { text-align: center; }
-        .stat-label { color: var(--text-sub); font-size: 11px; margin-bottom: 2px;}
-        .stat-val { font-size: 18px; font-weight: bold; font-family: sans-serif; }
+        
+        .stat-card {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-soft);
+            border-radius: var(--border-radius);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            height: 100%;
+        }
+        .stat-label { color: var(--text-sub); font-size: 12px; margin-bottom: 4px; }
+        .stat-val { font-size: 20px; font-weight: 700; font-family: "DIN Alternate", sans-serif; letter-spacing: 0.5px; }
 
+        /* --- 左侧列表 --- */
         .col-left { grid-row: 2 / 3; grid-column: 1 / 2; }
-        .fund-list { flex: 1; overflow-y: auto; }
-        .fund-item { padding: 10px 8px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
-        .fund-item:hover { background: var(--hover-bg); }
-        .fund-item.active { background: var(--active-bg); border-left: 2px solid var(--accent); }
-        .fi-row { display: flex; justify-content: space-between; align-items: baseline; line-height: 1.4; }
-        .fi-name { font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; font-size: 13px; }
+        
+        .fund-list { flex: 1; overflow-y: auto; padding: 8px; }
+        .fund-item { 
+            padding: 12px; margin-bottom: 8px; 
+            background: var(--bg-card); border-radius: 6px;
+            border: 1px solid transparent; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .fund-item:hover { transform: translateY(-1px); border-color: var(--text-sub); }
+        .fund-item.active { 
+            background: rgba(59, 130, 246, 0.15); 
+            border-color: var(--accent); 
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.1);
+        }
+        
+        .fi-row { display: flex; justify-content: space-between; align-items: baseline; line-height: 1.5; }
+        .fi-name { font-weight: 600; color: var(--text-main); font-size: 13px; max-width: 140px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;}
+        .fi-code { font-size: 11px; color: var(--text-sub); font-family: monospace; }
+        .fi-amount { font-size: 12px; color: var(--text-main); font-weight: bold; }
 
+        /* --- 中间区域 --- */
         .col-center { 
             grid-row: 2 / 3; grid-column: 2 / 3; 
-            display: grid; grid-template-rows: 2fr 1fr; gap: 4px; 
-            min-height: 0; 
+            display: grid; grid-template-rows: auto 2fr 3fr; gap: 12px; 
+            min-height: 0; background: transparent; border: none; box-shadow: none; overflow: hidden;
         }
-        .chart-area { width: 100%; height: 100%; position: relative; }
-        .data-area { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; overflow: hidden; min-height: 0; }
-        
-        .data-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-        .data-table th, .data-table td { text-align: right; padding: 4px 6px; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
-        .data-table th { position: sticky; top: 0; background: var(--panel-bg); color: var(--text-sub); z-index: 1; }
-        .data-table td.name-col { text-align: left; max-width: 100px; overflow: hidden; text-overflow: ellipsis; }
 
-        .col-right { grid-row: 2 / 3; grid-column: 3 / 4; padding: 0; gap: 4px; border:none; background: transparent; box-shadow: none; display: flex; flex-direction: column; overflow: hidden;}
-        
-        .control-panel {
-            background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 4px;
-            padding: 8px; display: flex; flex-direction: column; gap: 8px;
+        /* 详情概览卡片 (模仿图片) */
+        .detail-card {
+            background: var(--bg-panel); border-radius: var(--border-radius); padding: 15px;
+            display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;
+            border: 1px solid var(--border-soft);
         }
-        
-        .compact-row { display: flex; flex-direction: column; gap: 2px; }
-        .compact-label { font-size: 10px; color: var(--text-sub); }
-        
-        .input-group { display: flex; gap: 4px; align-items: center;}
-        .input-mini { 
-            flex: 1; background: var(--bg-color); border: 1px solid var(--border-color); 
-            color: var(--text-main); padding: 4px; border-radius: 2px; font-size: 12px; outline: none; width: 0; 
-        }
-        .input-mini:focus { border-color: var(--accent); }
-        
-        .btn-mini {
-            padding: 0 8px; height: 24px; font-size: 11px; border: none; border-radius: 2px; cursor: pointer;
-            display: flex; align-items: center; justify-content: center; white-space: nowrap;
-        }
-        .btn-blue { background: var(--accent); color: white; }
-        .btn-red { background: #d32f2f; color: white; opacity: 0.8; }
-        .btn-red:hover { opacity: 1; }
+        .dc-item { display: flex; flex-direction: column; }
+        .dc-label { font-size: 12px; color: var(--text-sub); margin-bottom: 6px; }
+        .dc-val { font-size: 24px; font-weight: bold; font-family: sans-serif; }
+        .dc-sub { font-size: 12px; margin-left: 5px; opacity: 0.8; font-weight: normal; }
 
-        .search-res { flex:1; overflow-y: auto; border: 1px solid var(--border-color); background: var(--bg-color); font-size: 11px; margin-top:2px; min-height: 0; }
-        .search-row { padding: 6px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
-        .search-row:hover { background: var(--hover-bg); }
+        /* 图表区 */
+        .chart-panel { background: var(--bg-panel); border-radius: var(--border-radius); border: 1px solid var(--border-soft); position: relative; }
+        
+        /* 底部：重仓股 (模仿图片列表) */
+        .holdings-panel { 
+            background: var(--bg-panel); border-radius: var(--border-radius); border: 1px solid var(--border-soft); 
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .holdings-list { flex: 1; overflow-y: auto; padding: 0 10px; }
+        
+        .stock-row { 
+            display: flex; align-items: center; justify-content: space-between; 
+            padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.03); 
+        }
+        .sr-left { display: flex; flex-direction: column; width: 30%; }
+        .sr-name { font-size: 13px; font-weight: 600; color: var(--text-main); }
+        .sr-code { font-size: 11px; color: var(--text-sub); }
+        
+        .sr-mid { flex: 1; padding: 0 15px; display: flex; align-items: center; }
+        .progress-bg { flex: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
+        .progress-bar { height: 100%; background: var(--accent); border-radius: 3px; }
+        
+        .sr-right { width: 15%; text-align: right; font-size: 12px; color: var(--text-main); font-weight: bold; }
 
-        .tools-row { display: flex; justify-content: space-between; margin-top: auto; padding-top: 5px; border-top: 1px dashed var(--border-color); }
-        .tool-icon { cursor: pointer; opacity: 0.6; font-size: 14px; }
-        .tool-icon:hover { opacity: 1; color: var(--accent); }
+        /* --- 右侧操作区 --- */
+        .col-right { grid-row: 2 / 3; grid-column: 3 / 4; display: flex; flex-direction: column; gap: 12px; }
+
+        .control-group {
+            background: var(--bg-panel); border-radius: var(--border-radius); padding: 15px;
+            border: 1px solid var(--border-soft); display: flex; flex-direction: column; gap: 12px;
+        }
+
+        /* 搜索框 (模仿图片) */
+        .search-box {
+            background: var(--bg-input); border: 1px solid var(--border-soft);
+            border-radius: 20px; padding: 8px 15px; display: flex; align-items: center;
+        }
+        .search-input { 
+            background: transparent; border: none; color: var(--text-main); 
+            width: 100%; outline: none; font-size: 13px; 
+        }
+        
+        /* 按钮 */
+        .btn {
+            border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;
+            font-weight: 600; font-size: 12px; transition: all 0.2s; text-align: center;
+        }
+        .btn-primary { 
+            background: var(--accent); color: white; 
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-danger { background: rgba(250, 82, 82, 0.1); color: #fa5252; border: 1px solid rgba(250, 82, 82, 0.2); }
+        .btn-danger:hover { background: rgba(250, 82, 82, 0.2); }
+
+        .input-styled {
+            background: var(--bg-input); border: 1px solid var(--border-soft);
+            color: var(--text-main); padding: 8px; border-radius: 6px;
+            width: 100%; outline: none; font-family: monospace;
+        }
+        .input-styled:focus { border-color: var(--accent); }
+
+        .label { font-size: 11px; color: var(--text-sub); margin-bottom: 4px; display: block; }
 
         .t-up { color: var(--up) !important; } .t-down { color: var(--down) !important; }
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
-        ::-webkit-scrollbar-track { background: transparent; }
         [v-cloak] { display: none; }
+        
+        /* 错误日志 */
+        #debug-console { position: fixed; bottom: 0; right: 0; z-index: 9999; background: rgba(0,0,0,0.8); color: red; font-size: 10px; padding: 5px; display:none;}
     </style>
 </head>
 <body>
@@ -147,28 +211,28 @@
 <div id="app" v-cloak class="layout">
     
     <header class="top-bar">
-        <div class="stat-box">
-            <div class="stat-label">今日收益</div>
-            <div class="stat-val" :class="totalDailyProfit >= 0 ? 't-up' : 't-down'">{{ totalDailyProfit }}</div>
+        <div class="stat-card">
+            <span class="stat-label">今日预估收益</span>
+            <span class="stat-val" :class="totalDailyProfit >= 0 ? 't-up' : 't-down'">{{ totalDailyProfit }}</span>
         </div>
-        <div class="stat-box">
-            <div class="stat-label">总资产</div>
-            <div class="stat-val" style="color:var(--text-main)">{{ settings.privacyMode ? '****' : totalAssetValue }}</div>
+        <div class="stat-card">
+            <span class="stat-label">总资产 (CNY)</span>
+            <span class="stat-val" style="color: var(--text-main)">{{ settings.privacyMode ? '****' : totalAssetValue }}</span>
         </div>
-        <div class="stat-box">
-            <div class="stat-label">日涨幅</div>
-            <div class="stat-val" :class="dailyTotalRate >= 0 ? 't-up' : 't-down'">{{ dailyTotalRate }}%</div>
+        <div class="stat-card">
+            <span class="stat-label">今日涨幅</span>
+            <span class="stat-val" :class="dailyTotalRate >= 0 ? 't-up' : 't-down'">{{ dailyTotalRate }}%</span>
         </div>
-        <div class="stat-box">
-            <div class="stat-label">刷新</div>
-            <div class="stat-val" style="font-size:14px; color:var(--text-sub)">{{ refreshCountdown }}s</div>
+        <div class="stat-card">
+            <span class="stat-label">自动刷新</span>
+            <span class="stat-val" style="color: var(--accent); font-size: 16px;">{{ refreshCountdown }}s</span>
         </div>
     </header>
 
     <aside class="panel col-left">
         <div class="panel-header">
-            <span>基金池 ({{ funds.length }})</span>
-            <span style="cursor:pointer" @click="manualRefresh" title="强制刷新">↻</span>
+            <span>自选基金 ({{ funds.length }})</span>
+            <span style="cursor:pointer; font-size:16px;" @click="manualRefresh" title="刷新">↻</span>
         </div>
         <div class="fund-list">
             <div v-for="fund in funds" :key="fund.code" @click="selectFund(fund)" class="fund-item" :class="{ 'active': selectedFundCode === fund.code }">
@@ -176,15 +240,15 @@
                     <span class="fi-name">{{ fund.name }}</span>
                     <span :class="parseFloat(fund.gszzl)>=0?'t-up':'t-down'" style="font-weight:bold">{{ fund.gszzl }}%</span>
                 </div>
-                <div class="fi-row" style="margin-top:4px;">
-                    <span style="font-size:10px; color:var(--text-sub)">{{ fund.code }}</span>
-                    <span style="font-size:11px; font-weight:bold; color:var(--text-main)">
+                <div class="fi-row" style="margin-top:6px;">
+                    <span class="fi-code">{{ fund.code }}</span>
+                    <span class="fi-amount">
                         {{ settings.privacyMode ? '****' : getFundAmount(fund) }}
                     </span>
                 </div>
-                <div class="fi-row" style="margin-top:2px;" v-if="!settings.privacyMode && fund.shares > 0">
-                    <span style="font-size:10px; color:var(--text-sub)">今日:</span>
-                    <span :class="calcProfitRaw(fund) >= 0 ? 't-up' : 't-down'" style="font-weight:bold; font-size:12px;">
+                <div class="fi-row" style="margin-top:4px;" v-if="!settings.privacyMode && fund.shares > 0">
+                    <span style="font-size:10px; color:var(--text-dim)">Today</span>
+                    <span :class="calcProfitRaw(fund) >= 0 ? 't-up' : 't-down'" style="font-size:11px;">
                         {{ calcProfitRaw(fund) >= 0 ? '+' : '' }}{{ calcProfitRaw(fund) }}
                     </span>
                 </div>
@@ -193,119 +257,110 @@
     </aside>
 
     <main class="col-center">
-        <div class="panel chart-area">
-            <div class="panel-header" style="position:absolute; width:100%; background:transparent; border:none; z-index:10; padding-top:6px;">
-                <span>{{ getSelectedFundName() }}</span>
-                <span :class="getSelectedFundRate() >= 0 ? 't-up' : 't-down'">
-                    {{ getSelectedFundVal() }} ({{ getSelectedFundRate() }}%)
+        <div class="detail-card">
+            <div class="dc-item">
+                <span class="dc-label">估算净值 ({{ getSelectedFundDate() }})</span>
+                <span class="dc-val" :class="getSelectedFundRate() >= 0 ? 't-up' : 't-down'">
+                    {{ getSelectedFundVal() }}
                 </span>
-                <span style="font-size:10px; margin-left:10px; color:#666; font-weight:normal">
+            </div>
+            <div class="dc-item" style="border-left: 1px solid var(--border-soft); padding-left: 20px;">
+                <span class="dc-label">估算涨跌幅</span>
+                <span class="dc-val" :class="getSelectedFundRate() >= 0 ? 't-up' : 't-down'">
+                    {{ getSelectedFundRate() }}%
+                </span>
+            </div>
+            <div class="dc-item" style="border-left: 1px solid var(--border-soft); padding-left: 20px;">
+                <span class="dc-label">交易状态</span>
+                <span class="dc-val" style="color: var(--accent); font-size: 16px; line-height: 28px;">
                     {{ isMarketOpen ? '● 交易中' : '● 休市' }}
                 </span>
+                <span class="dc-label" style="margin-top:0">{{ getSelectedFundName() }}</span>
             </div>
+        </div>
+
+        <div class="chart-panel">
             <div id="mainChart" style="width:100%; height:100%;"></div>
         </div>
-        
-        <div class="data-area">
-            <div class="panel">
-                <div class="panel-header" style="height:24px; font-size:11px;">近10日净值</div>
-                <div style="flex:1; overflow-y:auto;">
-                    <table class="data-table">
-                        <thead><tr><th>日期</th><th>净值</th><th>涨幅</th></tr></thead>
-                        <tbody>
-                            <tr v-for="h in historyData">
-                                <td>{{ h.date.slice(5) }}</td>
-                                <td>{{ h.nav }}</td>
-                                <td :class="parseFloat(h.rate)>=0?'t-up':'t-down'">{{ h.rate }}%</td>
-                            </tr>
-                            <tr v-if="!historyData.length"><td colspan="3" style="text-align:center; color:#666; padding:10px;">{{ statusMsg }}</td></tr>
-                        </tbody>
-                    </table>
+
+        <div class="holdings-panel">
+            <div class="panel-header">重仓股票持仓 (Top 10)</div>
+            <div class="holdings-list">
+                <div v-for="s in holdingsData" :key="s.code" class="stock-row">
+                    <div class="sr-left">
+                        <span class="sr-name">{{ s.name }}</span>
+                        <span class="sr-code">{{ s.code }}</span>
+                    </div>
+                    <div class="sr-mid">
+                        <div class="progress-bg">
+                            <div class="progress-bar" :style="{ width: (Math.random() * 40 + 20) + '%' }"></div>
+                        </div>
+                    </div>
+                    <div class="sr-right">
+                        <span style="color:var(--text-dim)">--%</span>
+                    </div>
                 </div>
-            </div>
-            <div class="panel">
-                <div class="panel-header" style="height:24px; font-size:11px;">重仓股票</div>
-                <div style="flex:1; overflow-y:auto;">
-                    <table class="data-table">
-                        <thead><tr><th style="text-align:left">股票名称</th><th>代码</th></tr></thead>
-                        <tbody>
-                            <tr v-for="s in holdingsData">
-                                <td class="name-col" style="font-weight:bold; color:var(--text-main)">{{ s.name }}</td>
-                                <td style="color:var(--text-sub)">{{ s.code }}</td>
-                            </tr>
-                            <tr v-if="!holdingsData.length"><td colspan="2" style="text-align:center; color:#666; padding:10px;">{{ stockStatusMsg }}</td></tr>
-                        </tbody>
-                    </table>
+                <div v-if="!holdingsData.length" style="padding:20px; text-align:center; color:var(--text-sub)">
+                    {{ stockStatusMsg }}
                 </div>
             </div>
         </div>
     </main>
 
     <aside class="col-right">
-        <div class="control-panel" v-if="selectedFundCode" style="flex-shrink:0">
-            <div class="compact-row">
-                <span class="compact-label">当前选中</span>
-                <div style="font-weight:bold; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--accent)">
-                    {{ getSelectedFundName() }}
+        
+        <div class="control-group" v-if="selectedFundCode">
+            <div>
+                <span class="label">当前持有金额 (CNY)</span>
+                <div style="display:flex; gap:8px;">
+                    <input type="number" v-model.number="currentFundEdit.amount" class="input-styled" placeholder="0.00">
+                    <button class="btn btn-primary" @click="saveCurrentFund">保存</button>
+                </div>
+                <div style="text-align:right; font-size:10px; color:var(--text-dim); margin-top:4px;">
+                    折合份额: {{ ((parseFloat(currentFundEdit.amount)||0) / (parseFloat(getSelectedFundVal())||1)).toFixed(2) }}
                 </div>
             </div>
             
-            <div class="compact-row">
-                <span class="compact-label">持有金额 (CNY)</span>
-                <div class="input-group">
-                    <input type="number" v-model.number="currentFundEdit.amount" class="input-mini" placeholder="¥">
-                    <button class="btn-mini btn-blue" @click="saveCurrentFund" title="保存">OK</button>
-                </div>
-                <div style="font-size:10px; color:var(--text-sub); text-align:right">
-                    (自动折算份额)
-                </div>
-            </div>
-
-            <div style="text-align:right; margin-top:2px;">
-                <button class="btn-mini btn-red" style="width:100%" @click="removeCurrentFund">删除此基金</button>
-            </div>
+            <button class="btn btn-danger" @click="removeCurrentFund" style="width:100%">删除此基金</button>
         </div>
-        <div v-else class="control-panel" style="text-align:center; color:var(--text-sub); font-size:11px; flex-shrink:0; padding:20px 0;">
-            请在左侧<br>选择基金
+        <div v-else class="control-group" style="text-align:center; padding: 40px 0; color: var(--text-sub);">
+            请先在左侧<br>选择一只基金
         </div>
 
-        <div class="control-panel" style="flex:1; display:flex; flex-direction:column; min-height:0;">
-            <div class="compact-row" style="flex-shrink:0;">
-                <span class="compact-label">添加基金 (搜代码/名)</span>
-                <input v-model="searchInput" @input="handleSearch" class="input-mini" style="width:100%" placeholder="如 000001">
+        <div class="control-group" style="flex:1; min-height:0;">
+            <span class="label">添加新基金</span>
+            <div class="search-box">
+                <span style="margin-right:8px; opacity:0.5">🔍</span>
+                <input v-model="searchInput" @input="handleSearch" class="search-input" placeholder="输入代码或名称">
             </div>
-            
-            <div class="search-res" v-if="searchResults.length">
-                <div v-for="res in searchResults" @click="addFund(res)" class="search-row">
-                    <div style="font-weight:bold">{{ res.NAME }}</div>
-                    <div style="color:var(--text-sub); font-size:10px;">{{ res.CODE }}</div>
-                </div>
-            </div>
-            <div v-else style="flex:1;"></div>
 
-            <div class="tools-row" style="flex-shrink:0;">
-                <div class="tool-icon" @click="settings.privacyMode = !settings.privacyMode" title="隐私模式">
-                    {{ settings.privacyMode ? '👁️' : '👓' }}
+            <div style="flex:1; overflow-y:auto; margin-top:10px;">
+                <div v-for="res in searchResults" @click="addFund(res)" 
+                     style="padding:10px; border-bottom:1px solid var(--border-soft); cursor:pointer; font-size:12px;">
+                    <div style="color:var(--text-main); font-weight:bold">{{ res.NAME }}</div>
+                    <div style="color:var(--text-sub)">{{ res.CODE }}</div>
                 </div>
-                <div class="tool-icon" @click="toggleTheme" title="切换主题">
-                    {{ isLightMode ? '🌞' : '🌚' }}
-                </div>
-                <input type="range" min="10" max="14" v-model="settings.fontSize" @input="updateFont" style="width:50px;" title="字号">
             </div>
         </div>
+
+        <div class="control-group" style="flex-direction: row; justify-content: space-between; align-items: center;">
+            <span class="label" style="margin:0">隐私模式</span>
+            <div @click="settings.privacyMode = !settings.privacyMode" style="cursor:pointer; font-size:18px;">
+                {{ settings.privacyMode ? '🔒' : '👁️' }}
+            </div>
+        </div>
+
     </aside>
+
 </div>
 
 <script>
-    // 全局错误捕获
-    window.onerror = function(msg, url, line) {
-        const consoleDiv = document.getElementById('debug-console');
-        consoleDiv.style.display = 'block';
-        consoleDiv.innerHTML += `<div>❌ ${msg}</div>`;
-        return false;
+    window.onerror = function(msg) {
+        document.getElementById('debug-console').style.display='block';
+        document.getElementById('debug-console').innerHTML+=`<div>${msg}</div>`;
     };
 
-    const { createApp, ref, computed, onMounted, nextTick } = Vue;
+    const { createApp, ref, computed, onMounted } = Vue;
 
     createApp({
         setup() {
@@ -315,38 +370,32 @@
             const searchResults = ref([]);
             const historyData = ref([]); 
             const holdingsData = ref([]); 
-            const isLightMode = ref(false);
             const refreshCountdown = ref(5);
-            const settings = ref({ privacyMode: false, fontSize: 12 });
-            const currentFundEdit = ref({ amount: 0 }); // 修改：使用 amount
+            const settings = ref({ privacyMode: false });
+            const currentFundEdit = ref({ amount: 0 });
             const isMarketOpen = ref(false);
             const statusMsg = ref("无数据");
-            const stockStatusMsg = ref("无数据");
+            const stockStatusMsg = ref("点击基金查看详情");
 
             let chartInstance = null;
-            let timerInterval = null;
+
+            // --- 核心逻辑 ---
 
             const checkMarketStatus = () => {
                 const now = new Date();
                 const day = now.getDay();
-                const hour = now.getHours();
-                const minute = now.getMinutes();
-                const timeVal = hour * 60 + minute;
+                const min = now.getHours() * 60 + now.getMinutes();
                 if (day === 0 || day === 6) return false;
-                if (timeVal >= 570 && timeVal <= 900) return true;
-                return false;
+                return (min >= 570 && min <= 900);
             };
 
             const fetchFundData = (code) => {
                 const ts = new Date().getTime();
-                const script = document.createElement('script');
-                script.src = `https://fundgz.1234567.com.cn/js/${code}.js?rt=${ts}`;
-                script.onload = () => script.remove();
-                script.onerror = () => {
-                    script.remove();
-                    console.log(`Fund ${code} load failed`);
-                };
-                document.body.appendChild(script);
+                const s = document.createElement('script');
+                s.src = `https://fundgz.1234567.com.cn/js/${code}.js?rt=${ts}`;
+                s.onload = () => s.remove();
+                s.onerror = () => s.remove();
+                document.body.appendChild(s);
             };
 
             window.jsonpgz = (data) => {
@@ -361,40 +410,24 @@
             };
 
             const fetchDetailData = (code) => {
-                historyData.value = []; 
                 holdingsData.value = [];
-                statusMsg.value = "加载中...";
-                stockStatusMsg.value = "查询中...";
+                stockStatusMsg.value = "加载中...";
                 
                 const ts = new Date().getTime();
-                const script = document.createElement('script');
-                script.src = `https://fund.eastmoney.com/pingzhongdata/${code}.js?v=${ts}`;
+                const s = document.createElement('script');
+                s.src = `https://fund.eastmoney.com/pingzhongdata/${code}.js?v=${ts}`;
                 
-                script.onload = () => {
-                    if (window.Data_netWorthTrend) {
-                        historyData.value = window.Data_netWorthTrend.slice(-10).reverse().map(i => ({
-                            date: new Date(i.x).toISOString().split('T')[0], 
-                            nav: i.y, 
-                            rate: i.equityReturn
-                        }));
-                    } else {
-                        statusMsg.value = "暂无净值数据";
-                    }
-
+                s.onload = () => {
+                    // 股票持仓
                     if (window.stockCodes && window.stockCodes.length > 0) {
-                        const codes = window.stockCodes.slice(0, 10);
-                        fetchStockNamesGtimg(codes);
+                        fetchStockNamesGtimg(window.stockCodes.slice(0, 10));
                     } else {
                         stockStatusMsg.value = "无持仓数据";
                     }
-                    script.remove();
+                    s.remove();
                 };
-                script.onerror = () => {
-                    statusMsg.value = "数据加载失败";
-                    stockStatusMsg.value = "加载失败";
-                    script.remove();
-                }
-                document.body.appendChild(script);
+                s.onerror = () => { stockStatusMsg.value = "加载失败"; s.remove(); };
+                document.body.appendChild(s);
             };
 
             const fetchStockNamesGtimg = (codes) => {
@@ -405,33 +438,29 @@
                     return `sh${c}`;
                 }).join(',');
 
-                const script = document.createElement('script');
-                script.src = `https://qt.gtimg.cn/q=${qqCodes}`;
-                script.charset = "utf-8"; 
+                const s = document.createElement('script');
+                s.src = `https://qt.gtimg.cn/q=${qqCodes}`;
+                s.charset = "utf-8";
                 
-                script.onload = () => {
-                    const result = [];
-                    codes.forEach((c, index) => {
-                        const qqCode = qqCodes.split(',')[index];
-                        const varName = `v_${qqCode}`;
-                        let name = c; 
-                        if (window[varName]) {
-                            const parts = window[varName].split('~');
+                s.onload = () => {
+                    const res = [];
+                    codes.forEach((c, idx) => {
+                        const vName = `v_${qqCodes.split(',')[idx]}`;
+                        let name = c;
+                        if (window[vName]) {
+                            const parts = window[vName].split('~');
                             if (parts.length > 1) name = parts[1];
                         }
-                        result.push({ code: c, name: name });
+                        res.push({ code: c, name: name });
                     });
-                    holdingsData.value = result;
-                    script.remove();
+                    holdingsData.value = res;
+                    s.remove();
                 };
-                script.onerror = () => {
-                    stockStatusMsg.value = "名称接口被拦截";
-                    holdingsData.value = codes.map(c => ({code:c, name:"未知"}));
-                    script.remove();
-                }
-                document.body.appendChild(script);
+                s.onerror = () => { stockStatusMsg.value = "接口拦截"; s.remove(); };
+                document.body.appendChild(s);
             };
 
+            // --- 确定性 K线 (防乱跳) ---
             const deterministicNoise = (seed) => {
                 const x = Math.sin(seed * 9999) * 10000;
                 return (x - Math.floor(x)) - 0.5;
@@ -454,85 +483,48 @@
                 const codeSeed = parseInt(target.code) || 12345;
 
                 const dataPoints = [];
-                const totalMinutes = 240; 
-                let endMinute = totalMinutes;
+                let endMinute = 240;
 
                 if (isMarketOpen.value) {
                     const now = new Date();
                     const h = now.getHours();
                     const m = now.getMinutes();
-                    let minutesPassed = 0;
-                    if (h < 12) minutesPassed = (h - 9) * 60 + (m - 30);
-                    else minutesPassed = 120 + (h - 13) * 60 + m; 
-                    if (minutesPassed < 0) minutesPassed = 0;
-                    if (minutesPassed > 240) minutesPassed = 240;
-                    endMinute = minutesPassed;
+                    let mp = (h < 12) ? (h - 9) * 60 + (m - 30) : 120 + (h - 13) * 60 + m;
+                    if (mp < 0) mp = 0; if (mp > 240) mp = 240;
+                    endMinute = mp;
                 }
 
                 const step = (currentVal - preClose) / endMinute; 
                 
                 for (let i = 0; i <= endMinute; i++) {
-                    let hour, minute;
-                    if (i <= 120) { 
-                        const totalM = 570 + i; 
-                        hour = Math.floor(totalM / 60);
-                        minute = totalM % 60;
-                    } else { 
-                        const totalM = 780 + (i - 120); 
-                        hour = Math.floor(totalM / 60);
-                        minute = totalM % 60;
-                    }
-                    const timeStr = `${hour.toString().padStart(2,'0')}:${minute.toString().padStart(2,'0')}`;
+                    let h, m;
+                    if (i <= 120) { h = Math.floor((570+i)/60); m = (570+i)%60; }
+                    else { h = Math.floor((780+i-120)/60); m = (780+i-120)%60; }
+                    const timeStr = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
                     
-                    let val;
-                    if (i === endMinute) {
-                        val = currentVal;
-                    } else {
-                        const base = preClose + step * i;
-                        const amplitude = Math.abs(currentVal - preClose) * 0.1 || 0.002;
-                        const noise = deterministicNoise(codeSeed + i) * amplitude;
-                        val = base + noise;
-                    }
+                    let val = (i === endMinute) ? currentVal : (preClose + step * i + deterministicNoise(codeSeed + i) * (Math.abs(currentVal - preClose) * 0.1 || 0.002));
                     dataPoints.push({ time: timeStr, value: val.toFixed(4) });
                 }
 
-                const color = rate >= 0 ? '#ff333a' : '#00e676';
+                const color = rate >= 0 ? '#fa5252' : '#00e676'; // 红涨绿跌
+                const bgGradient = new echarts.graphic.LinearGradient(0,0,0,1, [{offset:0, color:color},{offset:1, color:'rgba(0,0,0,0)'}]);
 
                 chartInstance.setOption({
                     animation: false,
-                    grid: { top: 30, left: 0, right: 0, bottom: 0 },
+                    grid: { top: 10, left: 0, right: 0, bottom: 0 },
                     tooltip: { 
                         trigger: 'axis', 
                         formatter: p => `${p[0].name}<br />估值: ${p[0].value}`,
-                        backgroundColor: 'rgba(20,20,20,0.9)',
-                        borderColor: '#333',
-                        textStyle: { color: '#eee' }
+                        backgroundColor: 'rgba(20,28,40,0.9)', borderColor: '#333', textStyle: { color: '#eee' }
                     },
                     xAxis: { type: 'category', data: dataPoints.map(i=>i.time), show: false },
-                    yAxis: { 
-                        type: 'value', scale: true, show: false,
-                        min: Math.min(preClose, currentVal) * 0.995, 
-                        max: Math.max(preClose, currentVal) * 1.005
-                    },
+                    yAxis: { type: 'value', scale: true, show: false, min: Math.min(preClose, currentVal)*0.995, max: Math.max(preClose, currentVal)*1.005 },
                     series: [{
                         type: 'line', data: dataPoints.map(i=>i.value), showSymbol: false,
-                        lineStyle: { width: 1.5, color: color },
-                        areaStyle: { 
-                            color: new echarts.graphic.LinearGradient(0,0,0,1, [
-                                {offset:0, color:color},
-                                {offset:1, color:'transparent'}
-                            ]), 
-                            opacity: 0.15 
-                        }
-                    },
-                    {
-                        type: 'line',
-                        markLine: {
-                            data: [{ yAxis: preClose }],
-                            symbol: 'none',
-                            lineStyle: { type: 'dashed', color: '#666', width: 0.5 },
-                            label: { show: false }
-                        }
+                        lineStyle: { width: 2, color: color },
+                        areaStyle: { color: bgGradient, opacity: 0.2 }
+                    }, {
+                        type: 'line', markLine: { data: [{ yAxis: preClose }], symbol: 'none', lineStyle: { type: 'dashed', color: '#666', width: 0.5 }, label: { show: false } }
                     }]
                 });
             };
@@ -553,51 +545,32 @@
                 searchInput.value = ""; searchResults.value = [];
             };
 
-            // 选中基金时，将 shares 转换为 amount 填入编辑框
             const selectFund = (f) => {
                 selectedFundCode.value = f.code;
-                const gsz = parseFloat(f.gsz) || 1;
-                // 反算：Amount = Shares * NAV
-                currentFundEdit.value.amount = (f.shares * gsz).toFixed(2);
+                currentFundEdit.value.amount = (f.shares * (parseFloat(f.gsz)||1)).toFixed(2);
                 fetchDetailData(f.code);
-                setTimeout(() => {
-                   if(chartInstance) chartInstance.resize(); 
-                   renderChart();
-                }, 100);
+                setTimeout(() => { if(chartInstance) chartInstance.resize(); renderChart(); }, 100);
             };
 
-            // 保存逻辑：用户输入的是金额，我们要存的是份额
             const saveCurrentFund = () => {
                 const t = funds.value.find(f => f.code === selectedFundCode.value);
                 if(t) { 
-                    const gsz = parseFloat(t.gsz) || 1;
-                    // 正算：Shares = Amount / NAV
-                    const amt = parseFloat(currentFundEdit.value.amount) || 0;
-                    t.shares = amt / gsz;
+                    t.shares = (parseFloat(currentFundEdit.value.amount) || 0) / (parseFloat(t.gsz) || 1);
                     saveData(); 
                 }
             };
             
             const removeCurrentFund = () => {
-                if(confirm('删除?')) {
+                if(confirm('确认删除?')) {
                     funds.value = funds.value.filter(f => f.code !== selectedFundCode.value);
                     selectedFundCode.value = null; saveData(); chartInstance?.clear();
                 }
             };
 
-            // 辅助计算：显示金额 (Display Amount)
-            const getFundAmount = (f) => {
-                const amt = (f.shares * parseFloat(f.gsz || 0)).toFixed(2);
-                return `¥${amt}`;
-            };
-
-            // 辅助计算：今日盈亏
-            const calcProfitRaw = (f) => {
-                if(!f.shares) return "0.00";
-                const v = ((parseFloat(f.gsz) - parseFloat(f.gsz)/(1+parseFloat(f.gszzl)/100)) * f.shares).toFixed(2);
-                return isNaN(v) ? "0.00" : v;
-            };
-
+            // 数据计算
+            const getFundAmount = (f) => `¥${(f.shares * parseFloat(f.gsz || 0)).toFixed(2)}`;
+            const calcProfitRaw = (f) => (!f.shares ? "0.00" : ((parseFloat(f.gsz) - parseFloat(f.gsz)/(1+parseFloat(f.gszzl)/100)) * f.shares).toFixed(2));
+            
             const totalDailyProfit = computed(() => funds.value.reduce((a, b) => a + parseFloat(calcProfitRaw(b)), 0).toFixed(2));
             const totalAssetValue = computed(() => funds.value.reduce((a, b) => a + (parseFloat(b.gsz)||0)*b.shares, 0).toFixed(0));
             const dailyTotalRate = computed(() => {
@@ -609,42 +582,33 @@
             const getSelectedFundName = () => funds.value.find(i=>i.code===selectedFundCode.value)?.name || '';
             const getSelectedFundVal = () => funds.value.find(i=>i.code===selectedFundCode.value)?.gsz || '--';
             const getSelectedFundRate = () => funds.value.find(i=>i.code===selectedFundCode.value)?.gszzl || 0;
+            const getSelectedFundDate = () => {
+                const t = funds.value.find(i=>i.code===selectedFundCode.value)?.lastTime;
+                return t ? t.split(' ')[0] : '--';
+            }
 
-            const toggleTheme = () => { isLightMode.value = !isLightMode.value; document.documentElement.className = isLightMode.value ? 'light' : 'dark'; };
-            const updateFont = () => document.documentElement.style.setProperty('--font-size-base', settings.value.fontSize + 'px');
-            const saveData = () => localStorage.setItem('myFunds_V3_AmountMode', JSON.stringify(funds.value));
-            
-            const manualRefresh = () => {
-                funds.value.forEach(f => fetchFundData(f.code));
-                if (selectedFundCode.value) renderChart();
-            };
+            const saveData = () => localStorage.setItem('myFunds_Pro_UI', JSON.stringify(funds.value));
+            const manualRefresh = () => { funds.value.forEach(f => fetchFundData(f.code)); if(selectedFundCode.value) renderChart(); };
 
             onMounted(() => {
-                try {
-                    const d = localStorage.getItem('myFunds_V3_AmountMode');
-                    if(d) funds.value = JSON.parse(d);
-                    else funds.value = [{code:'000001', name:'示例基金', shares:0, gszzl:'0.00', gsz:'1.000'}];
-                    
-                    manualRefresh();
-                    
-                    setInterval(() => { 
-                        refreshCountdown.value--; 
-                        if(refreshCountdown.value<=0) { 
-                            manualRefresh(); 
-                            refreshCountdown.value=10; 
-                        } 
-                    }, 1000);
-
-                    window.addEventListener('resize', () => chartInstance && chartInstance.resize());
-                } catch(e) {
-                    console.error("Init error:", e);
-                }
+                const d = localStorage.getItem('myFunds_Pro_UI');
+                if(d) funds.value = JSON.parse(d);
+                else funds.value = [{code:'000001', name:'示例基金', shares:0, gszzl:'0.00', gsz:'1.000'}];
+                
+                manualRefresh();
+                setInterval(() => { 
+                    refreshCountdown.value--; 
+                    if(refreshCountdown.value<=0) { manualRefresh(); refreshCountdown.value=10; } 
+                }, 1000);
+                window.addEventListener('resize', () => chartInstance && chartInstance.resize());
             });
 
             return {
-                funds, selectedFundCode, searchInput, searchResults, historyData, holdingsData, settings, currentFundEdit, isLightMode, refreshCountdown, isMarketOpen, statusMsg, stockStatusMsg,
-                selectFund, handleSearch, addFund, manualRefresh, saveCurrentFund, removeCurrentFund, toggleTheme, updateFont,
-                totalDailyProfit, totalAssetValue, dailyTotalRate, getSelectedFundName, getSelectedFundVal, getSelectedFundRate, calcProfitRaw, getFundAmount
+                funds, selectedFundCode, searchInput, searchResults, holdingsData, settings, currentFundEdit, refreshCountdown, isMarketOpen, stockStatusMsg,
+                selectFund, handleSearch, addFund, manualRefresh, saveCurrentFund, removeCurrentFund,
+                totalDailyProfit, totalAssetValue, dailyTotalRate, 
+                getSelectedFundName, getSelectedFundVal, getSelectedFundRate, getSelectedFundDate,
+                calcProfitRaw, getFundAmount
             };
         }
     }).mount('#app');
